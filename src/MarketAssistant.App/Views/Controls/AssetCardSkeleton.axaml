@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="120"
+             x:Class="MarketAssistant.Views.Controls.AssetCardSkeleton"
+             x:Name="Root">
+
+    <UserControl.Styles>
+        <!-- Tile 的底色就是 SurfaceVariant，灰条再用同色会隐形（骨架只剩一块灰面）；
+             Tile 内的灰条取深一档，与 AssetCardView.Tile 的 hover 同色阶。Card 底色是白，灰条用默认色即可。 -->
+        <Style Selector="controls|SkeletonCard.variant-tile Border.skeleton">
+            <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- AssetCardView 的结构克隆：同容器形态、同间距、同行高档位，只把文字换成灰条。
+         改真实卡片的结构时必须同步改这里，否则数据到达时会塌陷或撑开。 -->
+    <controls:SkeletonCard x:Name="Surface">
+        <StackPanel Spacing="{StaticResource SmallSpacing}">
+
+            <!-- 头部：名次 | 名称 14 + 代码 12 | 操作位（与 btn-icon-sm 同尺寸） -->
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <controls:SkeletonLines Grid.Column="0"
+                                        Row="Caption"
+                                        LineWidths="28"
+                                        Margin="{StaticResource SmallRightMargin}"
+                                        VerticalAlignment="Top"
+                                        IsVisible="{Binding #Root.HasRank}"/>
+                <StackPanel Grid.Column="1"
+                            Spacing="{StaticResource TinySpacing}"
+                            VerticalAlignment="Center">
+                    <controls:SkeletonLines Row="BodySm" LineWidths="96"/>
+                    <controls:SkeletonLines Row="Caption" LineWidths="64"/>
+                </StackPanel>
+                <Panel Grid.Column="2"
+                       Margin="{StaticResource SmallLeftMargin}"
+                       Width="{StaticResource SmallIconButtonSize}"
+                       Height="{StaticResource SmallIconButtonSize}"
+                       VerticalAlignment="Top">
+                    <Border Classes="skeleton skeleton-circle"
+                            Width="{StaticResource TinyIconSize}"
+                            Height="{StaticResource TinyIconSize}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"/>
+                </Panel>
+            </Grid>
+
+            <!-- 价格行：价格 24 | 涨跌标签 -->
+            <Grid ColumnDefinitions="*,Auto">
+                <controls:SkeletonLines Grid.Column="0"
+                                        Row="Title"
+                                        LineWidths="110"
+                                        VerticalAlignment="Center"/>
+                <controls:SkeletonLines Grid.Column="1"
+                                        Row="Caption"
+                                        LineWidths="52"
+                                        Margin="{StaticResource SmallLeftMargin}"
+                                        VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- 指标行（仅热门卡） -->
+            <controls:SkeletonLines Row="Caption"
+                                    LineWidths="96"
+                                    IsVisible="{Binding #Root.HasMetric}"/>
+        </StackPanel>
+    </controls:SkeletonCard>
+</UserControl>

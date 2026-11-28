@@ -11,8 +11,6 @@ public interface IHomeAssetService
     Task<List<AssetItem>> GetRecentAssetsAsync(CancellationToken cancellationToken = default);
 
     Task AddToRecentAssetsAsync(AssetItem asset, CancellationToken cancellationToken = default);
-
-    Task<bool> AddToFavoriteAsync(object assetParameter);
 }
 
 

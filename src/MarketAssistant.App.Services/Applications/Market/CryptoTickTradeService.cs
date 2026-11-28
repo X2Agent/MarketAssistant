@@ -14,8 +14,8 @@ public sealed class CryptoTickTradeService(
     BinanceMarketDataService binanceService,
     ILogger<CryptoTickTradeService> logger) : ITickTradeService
 {
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    private readonly ILogger<CryptoTickTradeService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly BinanceMarketDataService _binanceService = binanceService;
+    private readonly ILogger<CryptoTickTradeService> _logger = logger;
 
     public async Task<IReadOnlyList<TickTrade>> GetRecentTradesAsync(
         string code,

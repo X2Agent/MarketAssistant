@@ -44,9 +44,17 @@ public class LayeredMemoryContextProvider(
 
             _logger.LogDebug("分层记忆注入完成，总长度: {Length} 字符", sb.Length);
 
+            // 记忆值可能由 Agent 依据外部内容写入，不能以 System 权限跨会话持久生效：
+            // 用 User 角色并声明为数据，与 MAF TextSearchProvider 注入检索上下文的方式一致
             return
             [
-                new ChatMessage(ChatRole.System, sb.ToString())
+                new ChatMessage(
+                    ChatRole.User,
+                    $"""
+                    <user_memory>
+                    {ExternalDataFence.Wrap(sb.ToString(), "关于用户的长期记忆数据")}
+                    </user_memory>
+                    """)
             ];
         }
         catch (Exception ex)

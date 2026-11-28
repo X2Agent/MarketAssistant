@@ -18,8 +18,8 @@ public sealed class AShareOrderBookService(
     /// <summary>新浪个股接口固定返回五档。</summary>
     public const int MaxDepth = 5;
 
-    private readonly SinaStockQuoteClient _client = client ?? throw new ArgumentNullException(nameof(client));
-    private readonly ILogger<AShareOrderBookService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly SinaStockQuoteClient _client = client;
+    private readonly ILogger<AShareOrderBookService> _logger = logger;
 
     public async Task<OrderBookSnapshot?> GetOrderBookAsync(
         string code,

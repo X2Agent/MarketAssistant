@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.Crypto;
@@ -11,7 +10,7 @@ namespace MarketAssistant.Applications.Crypto;
 /// 端点：/fapi/v2/account、/fapi/v1/order、/fapi/v1/openOrders、/fapi/v2/positionRisk
 /// API文档：https://developers.binance.com/docs/derivatives/usds-margined-futures/general-info
 /// </summary>
-public sealed class BinanceFuturesAccountService(
+public sealed partial class BinanceFuturesAccountService(
     IHttpClientFactory httpClientFactory,
     ILogger<BinanceFuturesAccountService> logger,
     IBinanceAuthService authService,
@@ -22,6 +21,7 @@ public sealed class BinanceFuturesAccountService(
     protected override string OrderEndpoint => "/fapi/v1/order";
     protected override string OpenOrdersEndpoint => "/fapi/v1/openOrders";
     protected override string ExchangeInfoEndpoint => "/fapi/v1/exchangeInfo";
+    protected override bool IsFuturesApi => true;
 
     /// <summary>
     /// 合约下单附加 positionSide（单向模式 BOTH / 双向模式 LONG/SHORT）。
@@ -80,7 +80,7 @@ public sealed class BinanceFuturesAccountService(
     /// </summary>
     internal async Task<List<BinanceFuturesPositionRisk>> GetPositionInfoAsync(string? symbol = null, CancellationToken cancellationToken = default)
     {
-        try
+        return await ExecuteWithFriendlyErrorsAsync("查询合约持仓", async () =>
         {
             var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpperInvariant()}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
@@ -94,17 +94,7 @@ public sealed class BinanceFuturesAccountService(
             await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}查询合约持仓", cancellationToken);
 
             return await response.Content.ReadFromJsonAsync<List<BinanceFuturesPositionRisk>>(cancellationToken) ?? [];
-        }
-        catch (HttpRequestException ex)
-        {
-            Logger.LogError(ex, "{Label}查询合约持仓失败 - 网络错误", Label);
-            throw new FriendlyException($"{Label}查询合约持仓失败: 网络连接错误", ex);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            Logger.LogError(ex, "{Label}查询合约持仓失败", Label);
-            throw new FriendlyException($"{Label}查询合约持仓失败: {ex.Message}", ex);
-        }
+        });
     }
 
     /// <summary>
@@ -114,7 +104,7 @@ public sealed class BinanceFuturesAccountService(
     /// </summary>
     internal async Task SetLeverageAsync(string symbol, int leverage, CancellationToken cancellationToken = default)
     {
-        try
+        await ExecuteWithFriendlyErrorsAsync("设置合约杠杆", async () =>
         {
             var queryString = $"symbol={symbol.ToUpperInvariant()}&leverage={leverage}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
@@ -126,17 +116,7 @@ public sealed class BinanceFuturesAccountService(
             using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
             var response = await httpClient.SendAsync(request, cancellationToken);
             await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}设置合约杠杆", cancellationToken);
-        }
-        catch (HttpRequestException ex)
-        {
-            Logger.LogError(ex, "{Label}设置合约杠杆失败 - 网络错误", Label);
-            throw new FriendlyException($"{Label}设置合约杠杆失败: 网络连接错误", ex);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            Logger.LogError(ex, "{Label}设置合约杠杆失败", Label);
-            throw new FriendlyException($"{Label}设置合约杠杆失败: {ex.Message}", ex);
-        }
+        });
     }
 
 

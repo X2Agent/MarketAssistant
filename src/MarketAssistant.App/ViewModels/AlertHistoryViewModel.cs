@@ -1,11 +1,9 @@
 using System.Collections.ObjectModel;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Services.Market;
-using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels;
@@ -87,16 +85,7 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
     /// <summary>全部标记已读（同时清除导航未读徽标）。</summary>
     [RelayCommand]
     private async Task MarkAllReadAsync()
-    {
-        try
-        {
-            await _alertCenterService.MarkAllReadAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogWarning(ex, "标记告警全部已读失败");
-        }
-    }
+        => await SafeExecuteAsync(() => _alertCenterService.MarkAllReadAsync(), "标记告警已读");
 
     /// <summary>
     /// 一键转 AI 归因：跳转多分析师研判页分析该告警标的。

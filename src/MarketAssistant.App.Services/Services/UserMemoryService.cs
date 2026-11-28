@@ -9,7 +9,7 @@ namespace MarketAssistant.Services;
 /// 存储用户的投资偏好、历史分析结论、自定义标签等，供 AI 上下文使用。
 /// 采用有界设计：条目数上限 <see cref="MaxEntryCount"/>，总字符上限 <see cref="MaxTotalChars"/>。
 /// </summary>
-public class UserMemoryService(ILogger<UserMemoryService> logger) : SqliteServiceBase(logger)
+public class UserMemoryService(ILogger<UserMemoryService> logger, string? dbPath = null) : SqliteServiceBase(logger, dbPath)
 {
     public const int MaxEntryCount = 50;
     public const int MaxTotalChars = 5000;
@@ -177,30 +177,22 @@ public class UserMemoryService(ILogger<UserMemoryService> logger) : SqliteServic
 
     protected override async Task InitializeDatabaseAsync()
     {
-        try
-        {
-            await using var conn = await OpenConnectionAsync();
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS memories (
-                    category TEXT NOT NULL,
-                    key TEXT NOT NULL,
-                    value TEXT NOT NULL,
-                    priority INTEGER NOT NULL DEFAULT 0,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (category, key)
-                );
-                CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
-                CREATE INDEX IF NOT EXISTS idx_memories_priority ON memories(priority);
-                """;
-            await cmd.ExecuteNonQueryAsync();
-            Logger.LogInformation("用户记忆数据库初始化完成");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "初始化用户记忆数据库失败");
-            throw;
-        }
+        await using var conn = await OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS memories (
+                category TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                priority INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (category, key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+            CREATE INDEX IF NOT EXISTS idx_memories_priority ON memories(priority);
+            """;
+        await cmd.ExecuteNonQueryAsync();
+        Logger.LogInformation("用户记忆数据库初始化完成");
     }
 }
 

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Applications.InvestmentSelection.Models;
 
@@ -59,5 +60,11 @@ public class InvestmentSelectionResult
     [Range(0, 100)]
     [Description("AI置信度评分，范围0-100，不含引号，数值越高表示信心越强")]
     public float ConfidenceScore { get; set; }
+
+    /// <summary>
+    /// 本次实际应用的筛选条件（一行可读文案），仅供界面结果头展示；由 Executor 回填，不属于 LLM 输出契约
+    /// </summary>
+    [JsonIgnore]
+    public string? AppliedCriteria { get; set; }
 }
 

@@ -2,16 +2,19 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MarketAssistant.ViewModels"
         xmlns:infra="using:MarketAssistant.Infrastructure.Core"
+        xmlns:views="using:MarketAssistant.Views.Components"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        mc:Ignorable="d" d:DesignWidth="1440" d:DesignHeight="900"
         x:Class="MarketAssistant.Views.Windows.MainWindow"
         x:DataType="vm:MainWindowViewModel"
+        x:Name="Shell"
         Icon="/Assets/logo.ico"
         Title="MarketAssistant - 智能股票分析助手"
         MinWidth="{StaticResource MainWindowMinWidth}"
-        MinHeight="{StaticResource MainWindowMinHeight}">
+        MinHeight="{StaticResource MainWindowMinHeight}"
+        Background="{DynamicResource PageBackgroundBrush}">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -25,254 +28,274 @@
         <!-- Ctrl+M 快捷键切换市场 -->
         <KeyBinding Gesture="Ctrl+M" Command="{Binding ToggleMarketCommand}"/>
     </Window.KeyBindings>
+    <Window.Styles>
+        <!-- 窄窗收起：由代码后置在 ShellGrid 上切换 compact 类，
+             纯样式驱动，避免每次尺寸变化都遍历可视树。 -->
+        <Style Selector="Grid.compact TextBlock.nav-label">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid.compact TextBlock.nav-group">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid.compact StackPanel#BrandText">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid.compact StackPanel.nav-header">
+            <Setter Property="Margin" Value="0,16,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <!-- 收起后导航项内边距归零、内容居中（图标居中于 72px 轨道） -->
+        <Style Selector="Grid.compact Grid.nav-item">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid.compact StackPanel.nav-holder">
+            <Setter Property="Margin" Value="{StaticResource NavHolderCompactPadding}"/>
+        </Style>
+        <!-- 收起后市场切换芯片只剩图标级宽度（48px 内容区），去掉横向内边距与副箭头 -->
+        <Style Selector="Grid.compact Button.market-chip">
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Grid.compact PathIcon#MarketChipArrow">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="{StaticResource NavRailWidth}"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <!-- 左侧图标导航栏 -->
-        <Border Grid.Column="0"
-                Grid.Row="0"
-                Grid.RowSpan="2"
-                Background="{DynamicResource CardBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource RightBorderThickness}">
-            <Border.Resources>
-                <!-- 导航项模板：图标 + 活跃态左侧指示条（主导航与底部导航共享） -->
-                <DataTemplate x:Key="NavRailItemTemplate" x:DataType="vm:NavigationItemViewModel">
-                    <Panel Width="{StaticResource NavIconSize}"
-                           Height="{StaticResource NavIconSize}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           ToolTip.Tip="{Binding Title}">
-                        <svg:Svg Width="{StaticResource NavIconSize}"
-                                Height="{StaticResource NavIconSize}"
-                                Path="{Binding IconPath}"
-                                IsVisible="{Binding !IsVisible, ElementName=SelectedIcon}"/>
-                        <svg:Svg x:Name="SelectedIcon" Width="{StaticResource NavIconSize}"
-                                Height="{StaticResource NavIconSize}"
-                                Path="{Binding SelectedIconPath}"
-                                IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
-                        <!-- 告警未读徽标（仅告警导航项在存在未读时显示） -->
-                        <Ellipse Width="10"
-                                 Height="10"
-                                 Fill="{StaticResource ErrorBrush}"
-                                 Stroke="{DynamicResource CardBackgroundBrush}"
-                                 StrokeThickness="1.5"
-                                 HorizontalAlignment="Right"
-                                 VerticalAlignment="Top"
-                                 IsVisible="{Binding HasUnreadBadge}"/>
-                    </Panel>
-                </DataTemplate>
-            </Border.Resources>
-            <Border.Styles>
-                <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="0"/>
-                    <Setter Property="Margin" Value="{StaticResource SmallMargin}"/>
-                    <Setter Property="Width" Value="{StaticResource NavItemSize}"/>
-                    <Setter Property="Height" Value="{StaticResource NavItemSize}"/>
-                    <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                    <Setter Property="VerticalContentAlignment" Value="Center"/>
-                    <Setter Property="Cursor" Value="Hand"/>
-                </Style>
-                <!-- 活跃态：浅色选中背景，替代整块品牌蓝填充 -->
-                <Style Selector="ListBoxItem:selected">
-                    <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
-                </Style>
-                <Style Selector="ListBoxItem:focus">
-                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                    <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
-                </Style>
-                <!-- 导航栏市场切换芯片：显示当前市场，点击在 A股/虚拟币间切换（导航栏唯一切换入口） -->
-                <Style Selector="Button.market-chip">
-                    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                    <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-                    <Setter Property="Padding" Value="6,3"/>
-                    <Setter Property="FontSize" Value="{StaticResource MiniFontSize}"/>
-                    <Setter Property="FontWeight" Value="SemiBold"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                    <Setter Property="VerticalContentAlignment" Value="Center"/>
-                    <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-                    <Setter Property="Cursor" Value="Hand"/>
-                </Style>
-                <Style Selector="Button.market-chip:pointerover">
-                    <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-                </Style>
-            </Border.Styles>
-            <DockPanel Margin="{StaticResource LogoTopMargin}">
-                <!-- 应用 Logo（纯品牌展示）与市场切换芯片 -->
-                <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center" Spacing="{StaticResource SmallSpacing}">
-                    <!-- Logo：仅作品牌标识；市场切换由下方芯片与 Ctrl+M 承担，避免一处功能两个入口 -->
-                    <Border Width="{StaticResource AppLogoSize}"
-                            Height="{StaticResource AppLogoSize}"
-                            CornerRadius="{StaticResource DefaultCornerRadius}"
-                            ClipToBounds="True"
-                            HorizontalAlignment="Center">
-                        <Image Source="/Assets/logo_ui.png"
-                               Stretch="UniformToFill"
-                               HorizontalAlignment="Center"
+        <!-- ============================================================ -->
+        <!-- 侧边导航项：图标 + 文字。v3 从 72px 纯图标轨升级为 240px 文字导航 -->
+        <!-- Fluent 的列表项外观由 plain-list 清掉（见 ListStyles.axaml），这里只给导航自己的状态底色。 -->
+        <!-- 状态底色必须写在 ContentPresenter#PART_ContentPresenter 上：Fluent 的悬停 / 选中底色画在它身上， -->
+        <!-- 改 ListBoxItem.Background 会被盖住。 -->
+        <!-- ============================================================ -->
+        <Style Selector="ListBox.nav-list ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,2"/>
+            <Setter Property="Height" Value="{StaticResource NavItemHeight}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.nav-list ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.nav-list ListBoxItem:pointerover:not(:selected) /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        </Style>
+        <!-- 选中态：强调色浅底 + 强调色文字，不用左侧竖条（v3 去掉装饰性指示条） -->
+        <Style Selector="ListBox.nav-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
+        </Style>
+
+        <Style Selector="TextBlock.nav-label">
+            <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- 必须声明在基础 TextBlock.nav-label 之后：Avalonia 没有选择器特异性，同一属性后声明者胜出 -->
+        <Style Selector="ListBox.nav-list ListBoxItem:selected TextBlock.nav-label">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+        </Style>
+
+        <Style Selector="TextBlock.nav-group">
+            <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+            <Setter Property="Margin" Value="{StaticResource NavGroupMargin}"/>
+        </Style>
+
+        <!-- 市场切换芯片 -->
+        <Style Selector="Button.market-chip">
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="{StaticResource SegmentButtonPadding}"/>
+            <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.market-chip:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        </Style>
+
+        <!-- 顶栏已移除（v3）：返回导航浮层化于内容区左上角，行情条归属首页头部。 -->
+    </Window.Styles>
+
+    <Panel>
+        <Grid x:Name="ShellGrid">
+            <Grid.ColumnDefinitions>
+                <!-- 展开/收起宽度由代码后置按 CompactWindowBreakpoint 切换，取值来自 Spacing.axaml 令牌 -->
+                <ColumnDefinition Width="{StaticResource NavRailWidth}"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ============================================================ -->
+            <!-- 左侧导航：240px 文字导航                                       -->
+            <!-- ============================================================ -->
+            <Border Grid.Column="0"
+                    Name="NavRail"
+                    Background="{DynamicResource CardBackgroundBrush}">
+                <DockPanel>
+
+                    <!-- 品牌区 -->
+                    <StackPanel DockPanel.Dock="Top" Classes="nav-header" Margin="{StaticResource NavHeaderPadding}" Spacing="{StaticResource LargeSpacing}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                            <Border Width="{StaticResource AppLogoSize}"
+                                    Height="{StaticResource AppLogoSize}"
+                                    CornerRadius="{StaticResource SmallCornerRadius}"
+                                    ClipToBounds="True">
+                                <Image Source="/Assets/logo_ui.png" Stretch="UniformToFill"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center" Spacing="{StaticResource TinySpacing}" Name="BrandText">
+                                <TextBlock Text="MarketAssistant"
+                                           FontSize="{StaticResource BodySmFontSize}"
+                                           FontWeight="{DynamicResource WeightTitle}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock Text="AI 市场分析工作站"
+                                           FontSize="{StaticResource CaptionFontSize}"
+                                           Foreground="{DynamicResource TextDisabledBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 市场切换：全页面恒显 -->
+                        <Button Classes="market-chip"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding ToggleMarketCommand}"
+                                AutomationProperties.Name="切换市场"
+                                ToolTip.Tip="点击切换市场（Ctrl+M）">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding CurrentMarketText}" VerticalAlignment="Center"/>
+                                <PathIcon Name="MarketChipArrow"
+                                          Data="{StaticResource SwapIcon}"
+                                          Width="{StaticResource MiniIconSize}"
+                                          Height="{StaticResource MiniIconSize}"
+                                          VerticalAlignment="Center"
+                                          Opacity="0.6"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- 底部：设置 / 关于 -->
+                    <StackPanel DockPanel.Dock="Bottom" Margin="{StaticResource NavFooterPadding}" Spacing="{StaticResource TinySpacing}">
+                        <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="{StaticResource SmallBottomMargin}"/>
+                        <ListBox ItemsSource="{Binding BottomNavigationItems}"
+                                 SelectedItem="{Binding SelectedBottomNavigationItem}"
+                                 Classes="nav-list plain-list"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="{StaticResource NoPadding}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NavigationItemViewModel">
+                                    <Grid Classes="nav-item" ColumnDefinitions="20,*" Margin="{StaticResource NavItemInnerMargin}" VerticalAlignment="Center">
+                                        <Panel Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
+                                            <svg:Svg Width="20" Height="20" Path="{Binding IconPath}"
+                                                     IsVisible="{Binding !$parent[ListBoxItem].IsSelected}"/>
+                                            <svg:Svg Width="20" Height="20" Path="{Binding SelectedIconPath}"
+                                                     IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                                        </Panel>
+                                        <TextBlock Grid.Column="1" Classes="nav-label" Text="{Binding Label}"
+                                                   Margin="{StaticResource SmallLeftMargin}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
+
+                    <!-- 主导航 -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Classes="nav-holder" Margin="{StaticResource NavHolderPadding}">
+                            <TextBlock Classes="nav-group" Text="市场"/>
+                            <ListBox ItemsSource="{Binding MainNavigationItems}"
+                                     SelectedItem="{Binding SelectedMainNavigationItem}"
+                                     Classes="nav-list plain-list"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="{StaticResource NoPadding}">
+                                <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:NavigationItemViewModel">
+                                    <Grid Classes="nav-item" ColumnDefinitions="20,*,Auto" Margin="{StaticResource NavItemInnerMargin}" VerticalAlignment="Center">
+                                        <Panel Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
+                                            <svg:Svg Width="20" Height="20" Path="{Binding IconPath}"
+                                                     IsVisible="{Binding !$parent[ListBoxItem].IsSelected}"/>
+                                            <svg:Svg Width="20" Height="20" Path="{Binding SelectedIconPath}"
+                                                     IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                                        </Panel>
+                                        <TextBlock Grid.Column="1" Classes="nav-label"
+                                                   Text="{Binding Label}" Margin="{StaticResource SmallLeftMargin}"/>
+                                        <!-- 未读告警 -->
+                                        <Border Grid.Column="2"
+                                                Width="6" Height="6" CornerRadius="3"
+                                                Background="{DynamicResource ErrorBrush}"
+                                                VerticalAlignment="Center"
+                                                IsVisible="{Binding HasUnreadBadge}"/>
+                                    </Grid>
+                                </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- ============================================================ -->
+            <!-- 内容区：顶栏已移除（v3），二级页面的返回入口为布局内窄条。       -->
+            <!-- ============================================================ -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,*">
+                <ContentControl Grid.Row="1"
+                                Content="{Binding CurrentPage}"
+                                ContentTemplate="{StaticResource ViewLocator}"/>
+
+                <!-- 返回导航条：仅二级页面（CanGoBack）时出现；根页面整行折叠为零高度，
+                     不再使用浮层——浮层会遮挡页面左上角的卡片与标题。
+                     左侧「← 标题」，右侧是页面级操作槽：页面内不要为一个图标按钮另起一整行，
+                     否则顶部会多出一条几乎全空的横带。 -->
+                <Grid Grid.Row="0"
+                      ColumnDefinitions="Auto,*,Auto"
+                      ColumnSpacing="{StaticResource SmallSpacing}"
+                      Margin="{StaticResource BackBarMargin}"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding CanGoBack}">
+                    <!-- 返回：btn-icon 提供 40×40 标准点击区，图标 20。
+                         旧版是 btn-sm + Padding=0 的纯文本 ←，实际命中区只有约 10×20。 -->
+                    <Button Grid.Column="0"
+                            Classes="btn-ghost btn-icon"
+                            Command="{Binding GoBackCommand}"
+                            ToolTip.Tip="返回（Esc）"
+                            AutomationProperties.Name="返回">
+                        <PathIcon Data="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"
+                                  Width="{StaticResource SmallIconSize}"
+                                  Height="{StaticResource SmallIconSize}"/>
+                    </Button>
+                    <TextBlock Grid.Column="1"
+                               Name="PageTitle"
+                               Classes="body-sm"
+                               FontWeight="{DynamicResource WeightTitle}"
+                               Text="{Binding CurrentPageTitle}"
                                VerticalAlignment="Center"/>
-                    </Border>
 
-                    <!-- 市场切换芯片：当前市场名 + 切换指示，点击切换（ToggleMarket 与 Ctrl+M 等价） -->
-                    <Button Classes="market-chip"
-                            Width="60"
-                            HorizontalAlignment="Center"
-                            Command="{Binding ToggleMarketCommand}"
-                            AutomationProperties.Name="切换市场"
-                            ToolTip.Tip="点击切换市场（Ctrl+M）">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="{Binding CurrentMarketShortText}" VerticalAlignment="Center"/>
-                            <TextBlock Text="⇄" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-
-                <!-- 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）。
-                     注意：必须声明在主导航之前，否则作为 DockPanel 最后一个子元素会被 LastChildFill 当作填充项，Bottom 停靠失效导致两项不可见 -->
-                <ListBox DockPanel.Dock="Bottom"
-                         ItemsSource="{Binding BottomNavigationItems}"
-                         SelectedItem="{Binding SelectedBottomNavigationItem}"
-                         Background="Transparent"
-                         BorderThickness="{StaticResource NoBorderThickness}"
-                         Padding="{StaticResource NoPadding}"
-                         ItemTemplate="{StaticResource NavRailItemTemplate}"/>
-
-                <!-- 主导航（贴顶，DockPanel 最后的填充子项） -->
-                <ListBox ItemsSource="{Binding MainNavigationItems}"
-                         SelectedItem="{Binding SelectedMainNavigationItem}"
-                         Background="Transparent"
-                         BorderThickness="{StaticResource NoBorderThickness}"
-                         Padding="{StaticResource NoPadding}"
-                         ItemTemplate="{StaticResource NavRailItemTemplate}"/>
-            </DockPanel>
-        </Border>
-
-        <!-- 常驻顶部栏：仅在首页（行情条）与二级页面（返回 + 标题）显示；
-             其余根页面顶栏无实质内容，整条隐藏（市场切换器已移入左侧导航栏） -->
-        <Border Grid.Column="1"
-                Grid.Row="0"
-                Background="{DynamicResource CardBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource NavBarBottomBorder}"
-                IsVisible="{Binding ShowTopBar}">
-            <Grid ColumnDefinitions="Auto,Auto,*" Margin="{StaticResource PagePadding}">
-                <!-- 返回按钮 -->
-                <StackPanel Grid.Column="0" 
-                            Orientation="Horizontal" 
-                            Spacing="{StaticResource SmallSpacing}"
-                            IsVisible="{Binding CanGoBack}">
-                    <Button Command="{Binding GoBackCommand}"
-                            Background="Transparent"
-                            BorderThickness="{StaticResource NoBorderThickness}"
-                            Padding="{StaticResource SmallMargin}"
-                            ToolTip.Tip="返回">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="←" 
-                                       FontSize="{StaticResource SubTitleFontSize}" 
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="返回" 
-                                       FontSize="{StaticResource LabelFontSize}" 
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                    
-                    <Border Width="{StaticResource DividerHeight}" 
-                            Height="{StaticResource SmallIconSize}" 
-                            Background="{DynamicResource BorderBrush}"
-                            VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <!-- 页面标题 -->
-                <TextBlock Grid.Column="1"
-                           Text="{Binding CurrentPageTitle}"
-                           FontSize="{StaticResource LabelFontSize}"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-
-                <!-- 行情条（贯穿标题与市场切换器之间的弹性区域，均分分块展示，对齐原型 tb-ticker）；
-                     仅首页根页面常驻（其余根页面与二级详情页隐藏），无数据时随 ShowIndexTickers 自动隐藏 -->
-                <ItemsControl Grid.Column="2"
-                              ItemsSource="{Binding IndexTickers}"
-                              IsVisible="{Binding ShowIndexTickers}"
-                              HorizontalAlignment="Stretch"
-                              VerticalAlignment="Center"
-                              Margin="{StaticResource SmallHorizontalMargin}">
-                    <ItemsControl.Styles>
-                        <!-- 首块隐藏左侧分隔线（分隔线仅出现在块与块之间） -->
-                        <Style Selector="UniformGrid > ContentPresenter:first-child Border.ticker-sep">
-                            <Setter Property="IsVisible" Value="False"/>
-                        </Style>
-                    </ItemsControl.Styles>
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Rows="1"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:IndexTickerItemViewModel">
-                            <!-- ClipToBounds：极窄窗口下单元格内容溢出时按块裁剪，避免与相邻块文字重叠 -->
-                            <Panel VerticalAlignment="Center" ClipToBounds="True">
-                                <!-- 块间竖分隔线（对齐原型 tb-tsep） -->
-                                <Border Classes="ticker-sep"
-                                        Width="{StaticResource DividerHeight}"
-                                        Height="14"
-                                        Background="{DynamicResource BorderBrush}"
-                                        HorizontalAlignment="Left"/>
-                                <StackPanel Orientation="Horizontal"
-                                            Spacing="6"
-                                            HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}"
-                                               FontSize="{StaticResource SmallFontSize}"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBlock Text="{Binding Price}"
-                                               FontFamily="{StaticResource DataFontFamily}"
-                                               FontSize="{StaticResource SmallFontSize}"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="{Binding ChangeText}"
-                                               FontFamily="{StaticResource DataFontFamily}"
-                                               FontSize="{StaticResource SmallFontSize}"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding IsUp}"
-                                               Foreground="{StaticResource BullishBrush}"/>
-                                    <TextBlock Text="{Binding ChangeText}"
-                                               FontFamily="{StaticResource DataFontFamily}"
-                                               FontSize="{StaticResource SmallFontSize}"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding IsDown}"
-                                               Foreground="{StaticResource BearishBrush}"/>
-                                    <!-- 中性/无涨跌语义（平盘、主导率、恐惧贪婪分类） -->
-                                    <TextBlock Text="{Binding ChangeText}"
-                                               FontFamily="{StaticResource DataFontFamily}"
-                                               FontSize="{StaticResource SmallFontSize}"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding IsNeutral}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                </StackPanel>
-                            </Panel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    <!-- 页面级操作槽：按页面 ViewModel 类型注入操作控件，其 DataContext 即页面 VM。
+                         末尾的兜底空模板必须保留：全局 ViewLocator 匹配所有 ViewModelBase，
+                         没有它，其余二级页面会把整页视图渲染进返回条。 -->
+                    <ContentControl Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Content="{Binding CurrentPage}">
+                        <ContentControl.DataTemplates>
+                            <DataTemplate DataType="vm:AgentAnalysisViewModel">
+                                <views:AgentAnalysisMenuButton/>
+                            </DataTemplate>
+                            <DataTemplate DataType="vm:ViewModelBase">
+                                <Panel/>
+                            </DataTemplate>
+                        </ContentControl.DataTemplates>
+                    </ContentControl>
+                </Grid>
             </Grid>
-        </Border>
-
-        <!-- 右侧内容区域 -->
-        <ContentControl Grid.Column="1"
-                        Grid.Row="1"
-                        Content="{Binding CurrentPage}"
-                        ContentTemplate="{StaticResource ViewLocator}"/>
-    </Grid>
+        </Grid>
+    </Panel>
 
 </Window>

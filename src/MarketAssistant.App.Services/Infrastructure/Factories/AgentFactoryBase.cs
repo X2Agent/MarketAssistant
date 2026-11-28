@@ -20,9 +20,9 @@ public abstract class AgentFactoryBase(
     TokenTrackingMiddleware tokenTracking,
     ILogger logger)
 {
-    protected readonly IServiceProvider ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    protected readonly TokenTrackingMiddleware TokenTracking = tokenTracking ?? throw new ArgumentNullException(nameof(tokenTracking));
-    protected readonly ILogger Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    protected readonly IServiceProvider ServiceProvider = serviceProvider;
+    protected readonly TokenTrackingMiddleware TokenTracking = tokenTracking;
+    protected readonly ILogger Logger = logger;
 
     /// <summary>
     /// 基于 agentType 上的 <see cref="RequiresToolsAttribute"/> 与指定市场类型解析工具列表。

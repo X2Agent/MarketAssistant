@@ -9,11 +9,11 @@ namespace MarketAssistant.Applications.Settings;
 public class GitHubReleaseService(
     IHttpClientFactory httpClientFactory,
     IMemoryCache memoryCache,
-    ILogger<GitHubReleaseService> logger) : IReleaseService
+    ILogger<GitHubReleaseService> logger)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly IMemoryCache _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
-    private readonly ILogger<GitHubReleaseService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly IMemoryCache _memoryCache = memoryCache;
+    private readonly ILogger<GitHubReleaseService> _logger = logger;
     private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases";
     private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases/latest";
 
@@ -32,9 +32,9 @@ public class GitHubReleaseService(
                 throw new FriendlyException("当前版本号不能为空");
             }
 
-            if (!CheckRateLimit())
+            if (!CheckRateLimit() && _rateLimitInfo is { } rateLimit)
             {
-                var waitTime = _rateLimitInfo!.ResetTime - DateTime.UtcNow;
+                var waitTime = rateLimit.ResetTime - DateTime.UtcNow;
                 throw new FriendlyException($"GitHub API 速率限制已达上限，请等待 {waitTime.TotalMinutes:F0} 分钟后重试");
             }
 
@@ -87,7 +87,7 @@ public class GitHubReleaseService(
 
             return result;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "检查更新失败");
             throw new FriendlyException($"检查更新失败：{ex.Message}", ex);
@@ -165,11 +165,6 @@ public class GitHubReleaseService(
             _logger.LogInformation("更新文件下载完成：{SavePath}（{Size:F2} MB）", savePath, totalRead / 1024.0 / 1024.0);
             return savePath;
         }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "下载更新失败：HTTP 请求异常");
-            throw new FriendlyException($"下载失败：{ex.Message}", ex);
-        }
         catch (TaskCanceledException ex) when (cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning("下载已取消");
@@ -185,9 +180,9 @@ public class GitHubReleaseService(
             _logger.LogError(ex, "下载更新失败：无权限访问文件");
             throw new FriendlyException($"无权限保存文件：{ex.Message}", ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "下载更新失败：未知异常");
+            _logger.LogError(ex, "下载更新失败");
             throw new FriendlyException($"下载失败：{ex.Message}", ex);
         }
     }
@@ -237,9 +232,10 @@ public class GitHubReleaseService(
             _logger.LogInformation("成功获取 {Count} 个版本信息", releases.Count);
             return releases;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "获取版本信息失败：HTTP 请求异常");
+            _logger.LogError(ex, "获取版本信息失败");
+
             // 如果有缓存，返回缓存数据作为降级方案
             if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedFallback) &&
                 cachedFallback is not null)
@@ -247,31 +243,8 @@ public class GitHubReleaseService(
                 _logger.LogInformation("返回缓存的版本信息作为降级方案");
                 return cachedFallback;
             }
-            throw new FriendlyException($"网络请求失败：{ex.Message}", ex);
-        }
-        catch (TaskCanceledException ex)
-        {
-            _logger.LogError(ex, "获取版本信息失败：请求超时");
-            if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedFallback) &&
-                cachedFallback is not null)
-            {
-                return cachedFallback;
-            }
-            throw new FriendlyException("请求超时", ex);
-        }
-        catch (FriendlyException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "获取版本信息失败：未知异常");
-            if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedFallback) &&
-                cachedFallback is not null)
-            {
-                return cachedFallback;
-            }
-            throw new FriendlyException($"获取版本信息失败：{ex.Message}", ex);
+
+            throw new FriendlyException(DescribeFetchFailure(ex), ex);
         }
     }
 
@@ -304,26 +277,19 @@ public class GitHubReleaseService(
             _logger.LogInformation("成功获取最新版本信息：{Version}", release.TagName);
             return release;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "获取最新版本信息失败：HTTP 请求异常");
-            throw new FriendlyException($"网络请求失败：{ex.Message}", ex);
-        }
-        catch (TaskCanceledException ex)
-        {
-            _logger.LogError(ex, "获取最新版本信息失败：请求超时");
-            throw new FriendlyException("请求超时", ex);
-        }
-        catch (FriendlyException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "获取最新版本信息失败：未知异常");
-            throw new FriendlyException($"获取版本信息失败：{ex.Message}", ex);
+            _logger.LogError(ex, "获取最新版本信息失败");
+            throw new FriendlyException(DescribeFetchFailure(ex), ex);
         }
     }
+
+    private static string DescribeFetchFailure(Exception ex) => ex switch
+    {
+        HttpRequestException => $"网络请求失败：{ex.Message}",
+        TaskCanceledException => "请求超时",
+        _ => $"获取版本信息失败：{ex.Message}"
+    };
 
     private bool CheckRateLimit()
     {

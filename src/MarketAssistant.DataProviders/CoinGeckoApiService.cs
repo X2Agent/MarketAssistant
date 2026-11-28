@@ -21,8 +21,8 @@ public sealed class CoinGeckoApiService(
     private const string CoinsListSymbolMapCacheKey = "CoinGecko:CoinsListSymbolMap";
     private static readonly TimeSpan CoinsListCacheDuration = TimeSpan.FromHours(12);
 
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly ILogger<CoinGeckoApiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<CoinGeckoApiService> _logger = logger;
     private readonly IMemoryCache? _memoryCache = memoryCache;
     private Dictionary<string, string>? _fallbackSymbolMap;
     private DateTimeOffset _fallbackSymbolMapExpiresAt;

@@ -40,7 +40,7 @@ public sealed class SchemaMigrationTest
 
     /// <summary>
     /// 旧库中已存在的一条数据。迁移<b>必须保留</b>它——
-    /// 补列操作若误用重建表（drop & create），用户历史简报就会全部丢失。
+    /// 补列操作若误用重建表（drop &amp; create），用户历史简报就会全部丢失。
     /// </summary>
     private const string LegacyContent = "隔夜要闻：旧版本生成的简报";
 

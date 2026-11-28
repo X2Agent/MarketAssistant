@@ -59,7 +59,7 @@ public class ScoredResult(RagSearchCandidate item)
 /// </summary>
 public class RerankerService(ILogger<RerankerService> logger) : IRerankerService
 {
-    private readonly ILogger<RerankerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger<RerankerService> _logger = logger;
     // 权重与常量当前为静态默认值（所有实例共享）；如需运行时调参，可后续改为构造注入 ScoringWeights/ScoringConstants
     private static readonly ScoringWeights Weights = new();
     private static readonly ScoringConstants Constants = new();
@@ -68,8 +68,6 @@ public class RerankerService(ILogger<RerankerService> logger) : IRerankerService
         string query,
         IEnumerable<RagSearchCandidate> items)
     {
-        ArgumentNullException.ThrowIfNull(items);
-
         var itemList = items.ToList();
         if (itemList.Count == 0)
         {

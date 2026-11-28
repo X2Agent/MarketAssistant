@@ -1,5 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Factories;
@@ -27,6 +30,9 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
 
+    /// <summary>复制单条消息正文（终态消息才可复制）。</summary>
+    public IAsyncRelayCommand<ChatMessageAdapter?> CopyMessageCommand { get; }
+
     /// <summary>历史会话列表（按最近活跃倒序，来自持久化层摘要查询）。</summary>
     public ObservableCollection<ChatSessionSummaryItem> SessionHistory { get; } = [];
 
@@ -36,13 +42,9 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _stockCode = string.Empty;
-
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
     private bool _isProcessing = false;
-
-    [ObservableProperty]
-    private string _sendButtonText = "➤";
 
     /// <summary>历史会话面板是否展开。</summary>
     [ObservableProperty]
@@ -96,11 +98,54 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         _adaptiveCardConverter = adaptiveCardConverter;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
-        ToggleSessionHistoryCommand = new AsyncRelayCommand(ToggleSessionHistoryAsync);
-        RefreshSessionHistoryCommand = new AsyncRelayCommand(LoadSessionHistoryAsync);
-        RestoreSessionCommand = new AsyncRelayCommand<ChatSessionSummaryItem?>(RestoreSessionAsync);
-        DeleteSessionCommand = new AsyncRelayCommand<ChatSessionSummaryItem?>(DeleteSessionAsync);
+        ToggleSessionHistoryCommand = new AsyncRelayCommand(
+            () => SafeExecuteAsync(ToggleSessionHistoryAsync, "加载历史会话"));
+        RefreshSessionHistoryCommand = new AsyncRelayCommand(
+            () => SafeExecuteAsync(LoadSessionHistoryAsync, "加载历史会话"));
+        RestoreSessionCommand = new AsyncRelayCommand<ChatSessionSummaryItem?>(
+            item => SafeExecuteAsync(() => RestoreSessionAsync(item), "恢复历史会话"));
+        DeleteSessionCommand = new AsyncRelayCommand<ChatSessionSummaryItem?>(
+            item => SafeExecuteAsync(() => DeleteSessionAsync(item), "删除历史会话"));
         NewSessionCommand = new RelayCommand(StartNewSession);
+        CopyMessageCommand = new AsyncRelayCommand<ChatMessageAdapter?>(CopyMessageAsync);
+    }
+
+    /// <summary>
+    /// 复制单条消息正文到系统剪贴板，并触发复制成功反馈。
+    /// 剪贴板 API 需要 TopLevel，因此从当前主窗口取；取不到时静默跳过（不抛给用户）。
+    /// </summary>
+    private async Task CopyMessageAsync(ChatMessageAdapter? message)
+    {
+        if (message is null || !message.CanCopy)
+        {
+            return;
+        }
+
+        var topLevel = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow
+            : null;
+
+        if (topLevel?.Clipboard is null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Avalonia 12 的剪贴板改为数据包模型：先组包再整体写入
+            var transfer = new DataTransfer();
+            transfer.Add(DataTransferItem.CreateText(message.Content));
+            await topLevel.Clipboard.SetDataAsync(transfer).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            // 剪贴板可能被其他进程占用，失败时只记录不打断
+            Logger?.LogWarning(ex, "复制消息到剪贴板失败");
+            return;
+        }
+
+        // 递增触发令牌，气泡内的 CopyFeedback 监听到变化后播放对勾
+        message.CopyFeedbackTrigger++;
     }
 
     /// <summary>
@@ -132,7 +177,6 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         UserInput = string.Empty;
 
         IsProcessing = true;
-        SendButtonText = "⏹";
 
         var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" }, _adaptiveCardConverter)
         {
@@ -183,22 +227,12 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             Logger?.LogError(ex, "发送消息失败");
-
-            // 根据异常类型提供更友好的提示
-            aiMessage.Content = ex switch
-            {
-                HttpRequestException => "网络连接失败，请检查网络后重试",
-                UnauthorizedAccessException => "API密钥无效，请在设置中检查配置",
-                TaskCanceledException => "请求超时，请稍后重试",
-                _ => ErrorMessageMapper.GetUserFriendlyMessage(ex)
-            };
-
+            aiMessage.Content = ErrorMessageMapper.GetUserFriendlyMessage(ex);
             aiMessage.Status = MessageStatus.Failed;
         }
         finally
         {
             IsProcessing = false;
-            SendButtonText = "➤";
             _currentCancellationTokenSource?.Dispose();
             _currentCancellationTokenSource = null;
         }
@@ -237,19 +271,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task LoadSessionHistoryAsync()
     {
-        List<ChatSessionSummary> summaries;
-        try
-        {
-            summaries = await _sessionPersistence.GetSessionSummariesAsync();
-        }
-        catch (Exception ex)
-        {
-            // 列表加载失败不应影响聊天主流程：降级为空列表，面板内展示空态
-            Logger?.LogError(ex, "加载历史会话列表失败");
-            SessionHistory.Clear();
-            HasSessionHistory = false;
-            return;
-        }
+        var summaries = await _sessionPersistence.GetSessionSummariesAsync();
 
         var activeSessionId = _chatSession?.SessionId;
         SessionHistory.Clear();
@@ -275,17 +297,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         // 会话懒创建：侧边栏尚未发过消息时 _chatSession 为 null，先建壳再恢复
         EnsureChatSession();
 
-        bool restored;
-        try
-        {
-            restored = await _chatSession!.RestoreSessionAsync(item.Id);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "恢复历史会话失败: {SessionId}", item.Id);
-            return;
-        }
-
+        var restored = await _chatSession!.RestoreSessionAsync(item.Id);
         if (!restored)
         {
             // 快照已不存在（别处删除）：刷新列表让其消失，当前会话保持不变
@@ -315,19 +327,12 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
             "删除会话",
             $"确定要删除会话「{item.Title}」吗？删除后无法恢复。",
             "删除",
-            "取消");
+            "取消",
+            destructive: true);
         if (!confirmed)
             return;
 
-        try
-        {
-            await _sessionPersistence.DeleteSessionAsync(item.Id);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "删除历史会话失败: {SessionId}", item.Id);
-            return;
-        }
+        await _sessionPersistence.DeleteSessionAsync(item.Id);
 
         SessionHistory.Remove(item);
         HasSessionHistory = SessionHistory.Count > 0;

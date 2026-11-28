@@ -65,12 +65,16 @@ public sealed class AIAgentFailureIsolationTest
     [TestCategory("Unit")]
     public async Task RunAsync_InnerReturnsEmptyText_ShouldReturnMarkerMessage()
     {
-        var wrapped = CreateWrappedAgent("NewsEventAnalyst", new StubChatClient("   "), null);
+        var failures = new List<Exception>();
+        var wrapped = CreateWrappedAgent("NewsEventAnalyst", new StubChatClient("   "), failures.Add);
 
         var response = await wrapped.RunAsync([new ChatMessage(ChatRole.User, "分析")]);
 
         Assert.IsTrue(AnalystFailureMessages.IsFailureMarker(response.Text), "空输出应视为失败");
         Assert.Contains("未返回任何文本结论", response.Text);
+        Assert.HasCount(1, failures, "空输出也必须触发失败回调，聚合器才能感知降级");
+        Assert.IsInstanceOfType<InvalidOperationException>(failures[0]);
+        Assert.Contains("未返回任何文本结论", failures[0].Message);
     }
 
     [TestMethod]

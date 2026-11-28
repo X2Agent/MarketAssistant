@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:abstractions="using:MarketAssistant.Trading.Abstractions"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converters="using:MarketAssistant.Converters"
+             mc:Ignorable="d" d:DesignWidth="600"
+             x:Class="MarketAssistant.Views.Components.Trading.OrderRowView"
+             x:DataType="abstractions:ExchangeOrderResult">
+
+    <UserControl.Resources>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
+    </UserControl.Resources>
+
+    <!-- 未完成订单行：实时监控页与余额详情页共用。
+         第一行讲“是什么单”：交易对 + 买卖方向 + 订单类型，右侧给关键价格（限价单是委托价，
+         条件单是触发价）。第二行讲“成交到哪了”：已有成交才画进度条，部分成交会直接体现为进度未满，
+         避免“已触发”被误读成“已完全退出”；没有成交时只写数量，不画一排 0% 的空进度条。 -->
+    <Border Background="{DynamicResource SurfaceVariantBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            CornerRadius="{StaticResource TinyCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource TinyBottomMargin}">
+        <StackPanel Spacing="{StaticResource TinySpacing}">
+
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Symbol}"
+                           FontSize="{StaticResource BodySmFontSize}"
+                           FontWeight="{DynamicResource WeightTitle}"
+                           VerticalAlignment="Center"/>
+                <controls:StatusTag Grid.Column="1"
+                                    Text="{Binding SideText}"
+                                    Classes.bullish="{Binding IsBuy}"
+                                    Classes.bearish="{Binding !IsBuy}"/>
+                <controls:StatusTag Grid.Column="2" Text="{Binding TypeText}"/>
+                <StackPanel Grid.Column="4"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource TinySpacing}"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding HasDisplayPrice}">
+                    <TextBlock Classes="caption" Text="{Binding PriceLabel}" VerticalAlignment="Center"/>
+                    <TextBlock Classes="num-sm"
+                               VerticalAlignment="Center"
+                               Text="{Binding DisplayPrice, Converter={StaticResource PriceTextConverter}}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- 已有成交：进度条 + 已成 / 请求量 -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SmallSpacing}"
+                  IsVisible="{Binding HasFill}">
+                <ProgressBar Grid.Column="0"
+                             Minimum="0" Maximum="100"
+                             Value="{Binding FillProgressPercent}"
+                             Height="{StaticResource ProgressBarHeight}"
+                             VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1"
+                           Classes="num-sm"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="{}{0:F0}% · 已成 {1:0.########} / {2:0.########}">
+                            <Binding Path="FillProgressPercent"/>
+                            <Binding Path="ExecutedQty"/>
+                            <Binding Path="RequestedQty"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </Grid>
+
+            <!-- 尚无成交 -->
+            <TextBlock Classes="num-sm"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       IsVisible="{Binding !HasFill}"
+                       Text="{Binding RequestedQty, StringFormat='数量 {0:0.########} · 未成交'}"/>
+        </StackPanel>
+    </Border>
+</UserControl>

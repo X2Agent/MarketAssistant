@@ -389,22 +389,116 @@ public sealed class AssetScreenerServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void ApplyFilters_ShouldExcludeStableCoins()
+    public void DeterminePagination_WithoutFilters_ShouldStillFetchFullCandidatePool()
+    {
+        var criteria = new CryptoCriteria { Limit = IScreeningCriteria.CandidatePoolSize, Criteria = [] };
+
+        var (page, perPage) = CryptoScreenerService.DeterminePagination(criteria);
+
+        Assert.AreEqual(1, page);
+        Assert.AreEqual(250, perPage, "无条件时也要拉满 250：剔除锚定型代币并与币安 USDT 现货求交后，只拉 Limit+10 条凑不满候选池");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void ApplyFilters_ShouldExcludePeggedTokensOnly()
     {
         var markets = new List<CoinGeckoMarket>
         {
-            new() { Symbol = "btc", Name = "Bitcoin", CurrentPrice = 65000m, MarketCap = 1_200_000_000_000m },
-            new() { Symbol = "usdt", Name = "Tether", CurrentPrice = 1.0m, MarketCap = 120_000_000_000m },
-            new() { Symbol = "usdc", Name = "USD Coin", CurrentPrice = 1.0m, MarketCap = 35_000_000_000m },
-            new() { Symbol = "eth", Name = "Ethereum", CurrentPrice = 3200m, MarketCap = 380_000_000_000m }
+            CreateMarket("btc", 65000m, 1.2m, 8.5m),
+            CreateMarket("usdt", 1.0003m, 0.02m, -0.05m),
+            // 国债类 RWA 代币：旧的 10 符号清单识别不到
+            CreateMarket("buidl", 1.0m, 0m, 0m),
+            // 价格在 0.9–1.5 但 24h/30d 波动大，不是锚定型
+            CreateMarket("xrp", 0.946m, -2.43m, -26.97m),
+            CreateMarket("eth", 3200m, -0.5m, 3.1m)
         };
-        var criteria = new CryptoCriteria { Limit = 10, Criteria = [] };
+        var criteria = new CryptoCriteria { Limit = IScreeningCriteria.CandidatePoolSize, Criteria = [] };
 
         var filtered = CryptoScreenerService.ApplyFilters(markets, criteria);
 
-        Assert.HasCount(2, filtered);
-        Assert.IsTrue(filtered.All(m => m.Symbol is "btc" or "eth"));
+        CollectionAssert.AreEqual(new[] { "btc", "xrp", "eth" }, filtered.Select(m => m.Symbol).ToArray());
     }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow(1.0, 0.0, 0.0, true, DisplayName = "BUIDL：价格 1、24h 0%、30d 0%")]
+    [DataRow(1.0003, 0.02, -0.05, true, DisplayName = "USDT 级稳定币")]
+    [DataRow(0.946, -2.43, -26.97, false, DisplayName = "XRP：价格在带内但 24h/30d 波动大")]
+    [DataRow(1.0, 0.1, -3.5, false, DisplayName = "30d 波动达到 3%")]
+    [DataRow(1.2, 1.5, 0.2, false, DisplayName = "24h 波动达到 1%")]
+    [DataRow(0.5, 0.0, 0.0, false, DisplayName = "价格低于价格带")]
+    [DataRow(65000.0, 0.1, 0.5, false, DisplayName = "BTC：价格远高于价格带")]
+    public void IsPegged_ShouldRequirePriceBandAndLowVolatility(
+        double price, double change24h, double change30d, bool expected)
+    {
+        var market = CreateMarket("x", (decimal)price, (decimal)change24h, (decimal)change30d);
+
+        Assert.AreEqual(expected, CryptoScreenerService.IsPegged(market));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void IsPegged_WithoutThirtyDayChange_ShouldNotTreatAsPegged()
+    {
+        // 上市不足 30 天的币没有 30d 涨跌幅，无法确认锚定，不能当稳定币剔除
+        var market = CreateMarket("new", 1.0m, 0m, null);
+
+        Assert.IsFalse(CryptoScreenerService.IsPegged(market));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("market_cap")]
+    [DataRow("market_cap_rank")]
+    [DataRow("price_change_7d")]
+    [DataRow("price_change_30d")]
+    public void ApplyBinanceFilters_WithConditionBinanceCannotEvaluate_ShouldThrowFriendlyException(string code)
+    {
+        var tickers = new List<Binance24hrTicker>
+        {
+            new() { Symbol = "BTCUSDT", LastPrice = 65000m, QuoteVolume = 1_000_000_000m }
+        };
+        var criteria = new CryptoCriteria { Criteria = [new() { Code = code, MinValue = 1m }] };
+
+        var exception = Assert.Throws<FriendlyException>(
+            () => CryptoScreenerService.ApplyBinanceFilters(tickers, criteria));
+
+        Assert.Contains(code, exception.Message);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void ApplyBinanceFilters_WithSupportedConditions_ShouldFilterTickers()
+    {
+        var tickers = new List<Binance24hrTicker>
+        {
+            new() { Symbol = "BTCUSDT", LastPrice = 65000m, QuoteVolume = 1_000_000_000m, PriceChangePercent = 1.5m },
+            new() { Symbol = "ETHUSDT", LastPrice = 3200m, QuoteVolume = 500_000_000m, PriceChangePercent = -6m },
+            new() { Symbol = "DOGEUSDT", LastPrice = 0.12m, QuoteVolume = 900_000_000m, PriceChangePercent = 8m }
+        };
+        var criteria = new CryptoCriteria
+        {
+            Criteria =
+            [
+                new() { Code = "price_change_24h", MinValue = -10m, MaxValue = 5m },
+                new() { Code = "volume_24h", MinValue = 600_000_000m }
+            ]
+        };
+
+        var filtered = CryptoScreenerService.ApplyBinanceFilters(tickers, criteria);
+
+        CollectionAssert.AreEqual(new[] { "BTCUSDT" }, filtered.Select(t => t.Symbol).ToArray());
+    }
+
+    private static CoinGeckoMarket CreateMarket(string symbol, decimal price, decimal? change24h, decimal? change30d) => new()
+    {
+        Symbol = symbol,
+        Name = symbol,
+        CurrentPrice = price,
+        PriceChangePercentage24h = change24h,
+        PriceChangePercentage30dInCurrency = change30d
+    };
 
     #endregion
 }

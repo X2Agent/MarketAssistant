@@ -3,7 +3,9 @@ using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Technical;
+using MarketAssistant.Applications.Technical.Models;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,15 +25,26 @@ public sealed class CryptoTechnicalTools(
     private const int IndicatorBarCount = 250;
 
     private readonly ILogger<CryptoTechnicalTools> _logger = logger;
-    private readonly IKLineService _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
-    private readonly ITechnicalIndicatorService _indicatorService = indicatorService ?? throw new ArgumentNullException(nameof(indicatorService));
+    private readonly IKLineService _kLineService = kLineService;
+    private readonly ITechnicalIndicatorService _indicatorService = indicatorService;
 
-    [Description("获取近30日最新日线KDJ，支持BTC、ETH等币种")]
-    public async Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 四个指标方法共用的外壳：ToolExecutor 统一计时与异常转换、取日线指标快照；
+    /// 指标专属的空值校验、模型映射与成功日志由 <paramref name="map"/> 完成。
+    /// </summary>
+    private Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol, Func<TechnicalIndicatorSnapshot, T> map, CancellationToken cancellationToken = default)
     {
-        try
+        return ToolExecutor.ExecuteAsync($"计算虚拟币{indicator}指标", assetSymbol, _logger, async _ =>
         {
             var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
+            return map(snapshot);
+        }, cancellationToken);
+    }
+
+    [Description("获取近30日最新日线KDJ，支持BTC、ETH等币种")]
+    public Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync("KDJ", assetSymbol, snapshot =>
+        {
             if (snapshot.KdjK is null || snapshot.KdjD is null || snapshot.KdjJ is null)
                 throw new FriendlyException($"K线数据不足，无法计算KDJ指标: {assetSymbol}");
 
@@ -47,20 +60,12 @@ public sealed class CryptoTechnicalTools(
                 assetSymbol, kdj.K, kdj.D, kdj.J);
 
             return kdj;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "计算虚拟币KDJ指标失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"计算虚拟币KDJ指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
-        }
-    }
+        }, cancellationToken);
 
     [Description("获取近30日最新日线MACD，支持BTC、ETH等币种")]
-    public async Task<TechnicalMACD> GetMACDAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
-    {
-        try
+    public Task<TechnicalMACD> GetMACDAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync("MACD", assetSymbol, snapshot =>
         {
-            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
             if (snapshot.MacdDiff is null || snapshot.MacdDea is null)
                 throw new FriendlyException($"K线数据不足，无法计算MACD指标: {assetSymbol}");
 
@@ -78,20 +83,12 @@ public sealed class CryptoTechnicalTools(
                 assetSymbol, macd.Diff, macd.Dea, macd.Macd);
 
             return macd;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "计算虚拟币MACD指标失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"计算虚拟币MACD指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
-        }
-    }
+        }, cancellationToken);
 
     [Description("获取近30日最新日线BOLL，支持BTC、ETH等币种")]
-    public async Task<TechnicalBoll> GetBOLLAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
-    {
-        try
+    public Task<TechnicalBoll> GetBOLLAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync("BOLL", assetSymbol, snapshot =>
         {
-            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
             if (snapshot.BollUpper is null || snapshot.BollMiddle is null || snapshot.BollLower is null)
                 throw new FriendlyException($"K线数据不足，无法计算BOLL指标: {assetSymbol}");
 
@@ -107,20 +104,12 @@ public sealed class CryptoTechnicalTools(
                 assetSymbol, boll.U, boll.M, boll.D);
 
             return boll;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "计算虚拟币BOLL指标失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"计算虚拟币BOLL指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
-        }
-    }
+        }, cancellationToken);
 
     [Description("获取近30日最新日线MA，支持BTC、ETH等币种")]
-    public async Task<TechnicalMA> GetMAAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
-    {
-        try
+    public Task<TechnicalMA> GetMAAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync("MA", assetSymbol, snapshot =>
         {
-            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
             if (!snapshot.HasAnyValue)
                 throw new FriendlyException($"K线数据不足，无法计算MA指标: {assetSymbol}");
 
@@ -143,13 +132,7 @@ public sealed class CryptoTechnicalTools(
                 assetSymbol, ma.MA5, ma.MA10, ma.MA20);
 
             return ma;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "计算虚拟币MA指标失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"计算虚拟币MA指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
-        }
-    }
+        }, cancellationToken);
 
     public IEnumerable<AIFunction> GetFunctions()
     {
@@ -167,7 +150,7 @@ public sealed class CryptoTechnicalTools(
         [Description("返回根数，最大500")] int count = 30,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync<List<OhlcvBar>>("获取K线序列", assetSymbol, _logger, async _ =>
         {
             var klineType = interval.ToLowerInvariant() switch
             {
@@ -196,11 +179,6 @@ public sealed class CryptoTechnicalTools(
                     C = k.Close,
                     V = k.Volume
                 })];
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取K线序列失败: {Symbol} {Interval}", assetSymbol, interval);
-            throw new FriendlyException($"获取K线序列失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 }

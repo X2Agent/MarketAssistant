@@ -1,0 +1,81 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctb="clr-namespace:ColorTextBlock.Avalonia;assembly=ColorTextBlock.Avalonia">
+
+    <!-- ================================================================== -->
+    <!-- Markdown 渲染的令牌覆盖层（仅 RichTextBlock 使用，不在 App.axaml 全局引入）      -->
+    <!--                                                                     -->
+    <!-- 库自带的 FluentTheme 样式集有几处不属于本设计系统：标题 Light 字重 + 灰色 +     -->
+    <!-- 放大到 20+、表格满格黑线 + 斑马行、代码块上下 5px 粗条、行内代码紫调底色。       -->
+    <!-- 这里在它之后逐条覆盖成令牌：同一属性后加入的样式优先，所以必须排在它后面；       -->
+    <!-- 选择器沿用库的 .Markdown_Avalonia_MarkdownViewer 作用域，对其他控件零影响。     -->
+    <!--                                                                     -->
+    <!-- 字号只落在五档里：H1 Title(24) / H2 Body(16) / H3、H4 BodySm(14)，          -->
+    <!-- 正文保持库的默认字号，字重走 WeightTitle（暗色自动降档）。                    -->
+    <!-- ================================================================== -->
+
+    <!-- 正文前景：库自己不设前景，靠继承拿到 Fluent 的纯白 / 纯黑；暗色下纯白偏重发刺，
+         全库统一走 TextPrimaryBrush（#EDEDED） -->
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctb|CTextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- 标题：库默认是灰色 + Light 字重，这里换成令牌字重（前景由上面的通用规则统一）；
+         上方多留一点，下方紧贴所属段落 -->
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading1, .Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading2, .Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading3, .Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading4">
+        <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+        <Setter Property="Margin" Value="0,8,0,0"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading1">
+        <Setter Property="FontSize" Value="{DynamicResource TitleFontSize}"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading2">
+        <Setter Property="FontSize" Value="{DynamicResource BodyFontSize}"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading3, .Markdown_Avalonia_MarkdownViewer ctb|CTextBlock.Heading4">
+        <Setter Property="FontSize" Value="{DynamicResource BodySmFontSize}"/>
+    </Style>
+
+    <!-- 列表：库默认左缩进 40，放进气泡过深 -->
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Grid.List">
+        <Setter Property="Margin" Value="8,0,0,0"/>
+    </Style>
+
+    <!-- 表格：只留行分隔线，表头用强调色淡底（气泡与窗口两种底色上都分得出层） -->
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Border.Table">
+        <Setter Property="Margin" Value="0,5"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Grid.Table > Border">
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="Padding" Value="8,2"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Border.TableHeader">
+        <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Border.TableHeader ctb|CTextBlock">
+        <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Border.EvenTableRow">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- 代码块：去掉上下粗条，改为卡片底色圆角块 -->
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer Border.CodeBlock">
+        <Setter Property="Margin" Value="0,5"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource SmallCornerRadius}"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+    </Style>
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer TextBlock.CodeBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- 行内代码：强调色淡底 + 主文字色，替换库的紫调底色 -->
+    <Style Selector=".Markdown_Avalonia_MarkdownViewer ctb|CCode">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
+    </Style>
+</Styles>

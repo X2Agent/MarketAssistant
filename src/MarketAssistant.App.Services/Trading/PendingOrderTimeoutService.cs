@@ -124,9 +124,14 @@ public sealed class PendingOrderTimeoutService : IDisposable
         return cancelledCount;
     }
 
-    /// <summary>是否策略下限价单（排除手动单与紧急平仓单）。</summary>
-    private static bool IsStrategyLimitOrder(TradeRecord record) =>
-        record.OrderType == OrderType.Limit
+    /// <summary>
+    /// 是否策略下限价/挂买单（排除手动单与紧急平仓单）。
+    /// 供超时撤单两条路径（本服务的整体超时撤单、OrderStateSyncService 的部分成交余量撤单）
+    /// 共享同一口径：手动单由用户自己决策不自动撤；条件单腿的保护语义必须常驻，
+    /// 只有普通限价与 post-only 挂单才属于"触发已消耗、余量该撤"的范畴。
+    /// </summary>
+    internal static bool IsStrategyLimitOrder(TradeRecord record) =>
+        record.OrderType is OrderType.Limit or OrderType.PostOnlyLimit
         && !string.IsNullOrEmpty(record.StrategyId)
         && !record.StrategyId.Equals("manual", StringComparison.OrdinalIgnoreCase)
         && !record.StrategyId.Equals(EmergencyStopService.EmergencyCloseStrategyId, StringComparison.OrdinalIgnoreCase);

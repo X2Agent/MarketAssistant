@@ -34,6 +34,7 @@ public class TradeRecord
     public TradeRecordStatus Status { get; set; }
     [Description("交易所订单ID")]
     public long ExchangeOrderId { get; set; }
+    public bool ReduceOnly { get; set; }
     [Description("AI下单理由")]
     public string? AIReasoning { get; set; }
     [Description("创建时间")]
@@ -54,4 +55,19 @@ public class TradeRecord
     /// </summary>
     [Description("已实现盈亏")]
     public decimal RealizedPnl { get; set; }
+
+    /// <summary>
+    /// 是否为平仓成交（有已实现盈亏）。开仓成交为 0 盈亏，展示层据此隐藏"盈亏 0.00"，
+    /// 避免把"尚未结算"误读成"打平"。
+    /// </summary>
+    public bool HasRealizedPnl => RealizedPnl != 0;
+
+    /// <summary>是否有滑点数据（市价单成交后才有）。</summary>
+    public bool HasSlippage => SlippagePercent.HasValue;
+
+    /// <summary>是否已有成交。取消 / 失败且无成交的记录隐藏成交均价与手续费，避免显示“成交 0 @ 0”。</summary>
+    public bool HasFill => ExecutedQty > 0;
+
+    /// <summary>是否产生了手续费。</summary>
+    public bool HasCommission => Commission > 0;
 }

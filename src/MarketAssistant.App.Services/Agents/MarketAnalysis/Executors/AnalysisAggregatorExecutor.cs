@@ -1,5 +1,6 @@
 using MarketAssistant.Services.Agents.MarketAnalysis.Artifacts;
 using MarketAssistant.Agents.Analysts;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -38,10 +39,10 @@ public sealed partial class AnalysisAggregatorExecutor(
     /// <summary>消息未收齐时的默认降级宽限期（P0-1 缓解：避免事件流无声终止）。</summary>
     private static readonly TimeSpan DefaultIncompleteGrace = TimeSpan.FromSeconds(30);
 
-    private readonly ILogger<AnalysisAggregatorExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger<AnalysisAggregatorExecutor> _logger = logger;
     private readonly int _expectedAnalystCount = expectedAnalystCount;
     private readonly Guid _runId = runId;
-    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore;
     private readonly IReadOnlyDictionary<string, string> _displayNameByAgentName = displayNameByAgentName ?? new Dictionary<string, string>();
     private readonly TimeSpan _incompleteGrace = incompleteGracePeriod ?? DefaultIncompleteGrace;
     private readonly object _syncRoot = new();
@@ -57,8 +58,6 @@ public sealed partial class AnalysisAggregatorExecutor(
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(messages);
-
         var expectedCount = _expectedAnalystCount;
 
         List<ChatMessage>? readySuccesses = null;
@@ -80,11 +79,11 @@ public sealed partial class AnalysisAggregatorExecutor(
 
                 if (AnalystFailureMessages.IsFailureMarker(message.Text))
                 {
-                    CollectMessage(_failedMessages, message, expectedCount);
+                    CollectMessage(_failedMessages, message.AuthorName, message.Text!, expectedCount);
                     continue;
                 }
 
-                CollectMessage(_analystMessages, message, expectedCount);
+                CollectMessage(_analystMessages, message.AuthorName, ExtractResultJson(message.Text!), expectedCount);
             }
 
             var collectedCount = _analystMessages.Count;
@@ -153,12 +152,13 @@ public sealed partial class AnalysisAggregatorExecutor(
             degradeToken = _degradeCts.Token;
         }
 
-        _logger.LogWarning(
-            "分析师消息未收齐（{Collected} 成功 / {Failed} 失败 / 期望 {Expected}），将在 {Grace.TotalSeconds}s 后降级发送已有结果",
+        // Fan-In barrier 逐条转发，首批到达时必然未收齐，属常态；真正的降级以到期后的 Warning 为准
+        _logger.LogInformation(
+            "分析师消息未收齐（{Collected} 成功 / {Failed} 失败 / 期望 {Expected}），启动 {GraceSeconds}s 宽限计时，到期仍未收齐则降级发送已有结果",
             _analystMessages.Count,
             _failedMessages.Count,
             _expectedAnalystCount,
-            _incompleteGrace);
+            _incompleteGrace.TotalSeconds);
 
         _ = Task.Run(async () =>
         {
@@ -201,14 +201,13 @@ public sealed partial class AnalysisAggregatorExecutor(
     /// 按作者去重收集消息：同一作者的重复消息以最后一条为准；
     /// 无作者消息仅在未超出期望数量时兜底收集。
     /// </summary>
-    private static void CollectMessage(List<ChatMessage> target, ChatMessage message, int expectedCount)
+    private static void CollectMessage(List<ChatMessage> target, string? author, string text, int expectedCount)
     {
-        var normalized = new ChatMessage(ChatRole.Assistant, message.Text!)
+        var normalized = new ChatMessage(ChatRole.Assistant, text)
         {
-            AuthorName = message.AuthorName
+            AuthorName = author
         };
 
-        var author = message.AuthorName;
         var existingIndex = author == null
             ? -1
             : target.FindIndex(existing =>
@@ -219,6 +218,14 @@ public sealed partial class AnalysisAggregatorExecutor(
         else if (author != null || target.Count < expectedCount)
             target.Add(normalized);
     }
+
+    /// <summary>
+    /// 分析师产物以结果 JSON 为准：模型常在 JSON 前后附说明、代码围栏，甚至把同一份 JSON 输出两遍。
+    /// 在汇聚边界一次性提取，落盘产物、协调分析师读取、报告导出与聊天卡片看到的是同一份文本；
+    /// 提取不到 JSON 对象时保留原文。失败标记不经过这里（失败原因里可能带花括号）。
+    /// </summary>
+    private static string ExtractResultJson(string text)
+        => LlmJsonExtractor.TryExtractJson(text, out var json) && json.StartsWith('{') ? json : text;
 
     /// <summary>
     /// 构建发给 Coordinator 的载荷：降级说明（仅降级路径）+ 系统指引 + 各分析师摘要（全文已落盘，通过工具读取）+ 维度缺失说明 + 失败标记。
@@ -286,11 +293,7 @@ public sealed partial class AnalysisAggregatorExecutor(
                 .ConfigureAwait(false);
             return true;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // 落盘失败时回退为全文传递，保证协调阶段仍有完整信息可用
             _logger.LogError(ex, "产物落盘失败: Run: {RunId}, Analyst: {Analyst}，将回退为全文注入",

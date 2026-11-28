@@ -1,204 +1,191 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- 品牌主色调 - 采用专业金融蓝 -->
-    <Color x:Key="Primary">#1976D2</Color>
-    <Color x:Key="PrimaryDark">#0D47A1</Color>
-    <Color x:Key="PrimaryLight">#42A5F5</Color>
-    <Color x:Key="Secondary">#424242</Color>
-    <Color x:Key="SecondaryLight">#616161</Color>
-    <Color x:Key="Accent">#FF6B35</Color>
+    <!-- ================================================================== -->
+    <!-- MarketAssistant Design System v3.0 — Color Tokens                    -->
+    <!--                                                                     -->
+    <!-- 三条硬规则（改动前请先读）：                                          -->
+    <!--  1. 只有一个交互强调色 Accent。其余一切后退为中性灰。                  -->
+    <!--     语义色（涨/跌/警告/危险）只表达数据语义，禁止用于装饰、图标底色。   -->
+    <!--  2. 不画边框。层次靠表面色阶（1%–3% 微对比）+ 阴影，不靠 1px 描边。    -->
+    <!--  3. 明暗两套中性阶各自独立取色（暗色用纯中性，不用蓝调），              -->
+    <!--     主题感知资源一律 DynamicResource 引用，StaticResource 不会随主题刷新。 -->
+    <!-- ================================================================== -->
 
-    <!-- 功能性颜色 - 对齐设计系统 v2.2（Tailwind 语义色） -->
-    <Color x:Key="Success">#10B981</Color>
-    <Color x:Key="Warning">#F59E0B</Color>
-    <Color x:Key="Error">#EF4444</Color>
-    <Color x:Key="Info">#3B82F6</Color>
+    <!-- ========== 唯一强调色 ========== -->
+    <!-- 交互语义：主按钮、选中态、链接、焦点环、进度。 -->
+    <Color x:Key="AccentColor">#0066FF</Color>
+    <Color x:Key="AccentHoverColor">#0052CC</Color>
+    <Color x:Key="AccentPressedColor">#0040A3</Color>
 
-    <!-- 功能色按钮交互状态 - 悬停(变浅)与按下(变深) -->
-    <Color x:Key="SuccessHover">#34D399</Color>
-    <Color x:Key="SuccessPressed">#059669</Color>
-    <Color x:Key="WarningHover">#FBBF24</Color>
-    <Color x:Key="WarningPressed">#D97706</Color>
-    <Color x:Key="InfoHover">#60A5FA</Color>
-    <Color x:Key="InfoPressed">#2563EB</Color>
-    
-    <!-- 股票涨跌颜色 - 中国市场标准（红涨绿跌） -->
-    <Color x:Key="BullishRed">#F44336</Color>
-    <Color x:Key="BearishGreen">#4CAF50</Color>
+    <!-- ========== 语义色（只用于数据与状态，不参与装饰） ========== -->
+    <!-- A 股/中国用户默认红涨绿跌；数值正负、买卖方向、成败提示复用同一语义。 -->
+    <Color x:Key="BullishRed">#E5484D</Color>
+    <Color x:Key="BearishGreen">#16A34A</Color>
+    <Color x:Key="Neutral">#8A93A0</Color>
 
-    <!-- 涨跌标签背景 - 约 12% 透明度色块（设计系统 v2.1 裁决第 4 条：靠色块而非纯文字色区分语义） -->
-    <SolidColorBrush x:Key="BullishTagBackgroundBrush" Color="#1FF44336"/>
-    <SolidColorBrush x:Key="BearishTagBackgroundBrush" Color="#1F4CAF50"/>
-    <SolidColorBrush x:Key="NeutralTagBackgroundBrush" Color="#149E9E9E"/>
+    <Color x:Key="Success">#16A34A</Color>
+    <Color x:Key="Warning">#D97706</Color>
+    <!-- Error 没有全局 Color：错误色明暗两套取值不同（暗色需提亮），
+         统一在 ThemeDictionaries 里以 ErrorBrush 提供，避免这里放一个"看起来能用"的值。 -->
 
-    <!-- 中性色系 - 用于灰色状态 -->
-    <Color x:Key="Neutral">#9E9E9E</Color>
+    <!-- ========== 涨跌标签底色（约 12% 透明度色块，靠色块而非纯文字色区分语义） ========== -->
+    <SolidColorBrush x:Key="BullishTagBackgroundBrush" Color="#1FE5484D"/>
+    <SolidColorBrush x:Key="BearishTagBackgroundBrush" Color="#1F16A34A"/>
+    <SolidColorBrush x:Key="NeutralTagBackgroundBrush" Color="#148A93A0"/>
+    <!-- 状态标签（一次性 / 已触发）：12% 警告色底 + 警告色字。
+         语义色只出现在这类小面积标签上，不做实底块。 -->
+    <SolidColorBrush x:Key="WarningTagBackgroundBrush" Color="#1FD97706"/>
+    <SolidColorBrush x:Key="DangerTagBackgroundBrush" Color="#1FDC2626"/>
+    <!-- 低风险等“正向状态”标签：与 BearishTagBackgroundBrush 同色值但语义不同——
+         后者表达“价格下跌”，不能拿来标“安全/成功” -->
+    <SolidColorBrush x:Key="SuccessTagBackgroundBrush" Color="#1F16A34A"/>
+    <!-- 提示 / 模拟环境等中性说明标签：12% 强调色底，字色用 InfoPanelTextBrush。
+         与 SelectedBackgroundBrush 区分——后者只表达“选中”。 -->
+    <SolidColorBrush x:Key="InfoTagBackgroundBrush" Color="#1F0066FF"/>
 
-    <!-- 主题变体颜色 - 支持亮色/暗色主题 -->
+    <!-- ================================================================== -->
+    <!-- 主题色阶：Light / Dark                                              -->
+    <!--                                                                     -->
+    <!-- 表面层级（浅色）：Page #F5F7FA → Card #FFFFFF → Sunken #EEF0F3       -->
+    <!-- 表面层级（暗色）：Page #0D0D0D → Card #161616 → Sunken #101010      -->
+    <!--                   → Raised #1C1C1C（下拉/弹窗等真正浮起的层）        -->
+    <!-- 相邻层色差只有 1%–3%，这正是"不画边框也能分层"的来源。                -->
+    <!-- ================================================================== -->
     <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key='Light'>
-            <!-- 背景层级 - 对齐设计系统 v2 -->
-            <SolidColorBrush x:Key='PageBackgroundBrush'>#F5F6F8</SolidColorBrush>
-            <SolidColorBrush x:Key='CardBackgroundBrush'>#FFFFFF</SolidColorBrush>
-            <!-- 列表项背景 - 统一使用白色卡片背景，去除灰色底 -->
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#FFFFFF</SolidColorBrush>
-            <SolidColorBrush x:Key='SurfaceVariantBrush'>#F0F1F3</SolidColorBrush>
-            
-            <!-- 文本颜色 - 增强对比度（对齐设计系统 v2.2） -->
-            <SolidColorBrush x:Key='TextPrimaryBrush'>#1A1D26</SolidColorBrush>
-            <SolidColorBrush x:Key='TextSecondaryBrush'>#6B7280</SolidColorBrush>
-            <SolidColorBrush x:Key='TextDisabledBrush'>#9CA3AF</SolidColorBrush>
-            
-            <!-- 边框和分割线 - 更清晰的层次 -->
-            <SolidColorBrush x:Key='BorderBrush'>#E0E2E8</SolidColorBrush>
-            <SolidColorBrush x:Key='SubtleBorderBrush'>#EEF0F4</SolidColorBrush>
-            <SolidColorBrush x:Key='DividerBrush'>#EEF0F4</SolidColorBrush>
-            
-            <!-- 交互状态 - 选中态使用品牌蓝 15% 填充（bg-selected） -->
-            <SolidColorBrush x:Key='HoverBackgroundBrush'>#F5F5F5</SolidColorBrush>
-            <SolidColorBrush x:Key='PressedBackgroundBrush'>#EEEEEE</SolidColorBrush>
-            <SolidColorBrush x:Key='SelectedBackgroundBrush'>#261976D2</SolidColorBrush>
-    <SolidColorBrush x:Key='ModeCardSelectedTextBrush'>#0D47A1</SolidColorBrush>
-            
-            <!-- 阴影颜色 -->
-            <SolidColorBrush x:Key='ShadowBrush'>#40000000</SolidColorBrush>
-            
-            <!-- 语义化容器背景 -->
-            <SolidColorBrush x:Key='DangerBackgroundBrush'>#FEF2F2</SolidColorBrush>
 
-            <!-- 语义面板（提示/建议/亮点风险区块） -->
-            <SolidColorBrush x:Key='SuccessPanelBackgroundBrush'>#ECFDF5</SolidColorBrush>
-            <SolidColorBrush x:Key='SuccessPanelBorderBrush'>#10B981</SolidColorBrush>
-            <SolidColorBrush x:Key='SuccessPanelTextBrush'>#065F46</SolidColorBrush>
-            <SolidColorBrush x:Key='WarningPanelBackgroundBrush'>#FFFBEB</SolidColorBrush>
-            <SolidColorBrush x:Key='WarningPanelBorderBrush'>#F59E0B</SolidColorBrush>
-            <SolidColorBrush x:Key='WarningPanelTextBrush'>#92400E</SolidColorBrush>
-            <SolidColorBrush x:Key='InfoPanelBackgroundBrush'>#F0F9FF</SolidColorBrush>
-            <SolidColorBrush x:Key='InfoPanelBorderBrush'>#3B82F6</SolidColorBrush>
-            <SolidColorBrush x:Key='InfoPanelTextBrush'>#1E40AF</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelBackgroundBrush'>#FEE2E2</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelBorderBrush'>#EF4444</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelTextBrush'>#991B1B</SolidColorBrush>
+        <ResourceDictionary x:Key="Light">
+            <!-- 表面色阶 -->
+            <SolidColorBrush x:Key="PageBackgroundBrush">#F5F7FA</SolidColorBrush>
+            <SolidColorBrush x:Key="CardBackgroundBrush">#FFFFFF</SolidColorBrush>
+            <SolidColorBrush x:Key="ItemBackgroundBrush">#FFFFFF</SolidColorBrush>
+            <SolidColorBrush x:Key="SurfaceVariantBrush">#F0F2F5</SolidColorBrush>
+            <SolidColorBrush x:Key="SunkenBackgroundBrush">#EEF0F3</SolidColorBrush>
+            <!-- 骨架灰条：浅色与 SurfaceVariant 同值 -->
+            <SolidColorBrush x:Key="SkeletonBrush">#F0F2F5</SolidColorBrush>
 
-            <!-- 聚焦/激活边框（border-active）与 Danger 面板强化档（按钮 hover） -->
-            <SolidColorBrush x:Key='BorderActiveBrush'>#1976D2</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelBackgroundStrongBrush'>#FEE2E2</SolidColorBrush>
+            <!-- 文字三档：主 / 次 / 弱。纯黑仅出现在主文字上。 -->
+            <SolidColorBrush x:Key="TextPrimaryBrush">#14161A</SolidColorBrush>
+            <SolidColorBrush x:Key="TextSecondaryBrush">#5C6470</SolidColorBrush>
+            <SolidColorBrush x:Key="TextDisabledBrush">#8A93A0</SolidColorBrush>
+
+            <!-- 分隔：默认不画边框，仅在表格行、分区之间用极浅色阶 -->
+            <SolidColorBrush x:Key="BorderBrush">#E4E7ED</SolidColorBrush>
+            <SolidColorBrush x:Key="SubtleBorderBrush">#EEF0F3</SolidColorBrush>
+            <SolidColorBrush x:Key="DividerBrush">#E4E7ED</SolidColorBrush>
+
+            <!-- 交互态：hover 只加深色阶，不放大、不加亮线 -->
+            <SolidColorBrush x:Key="HoverBackgroundBrush">#F0F2F5</SolidColorBrush>
+            <SolidColorBrush x:Key="PressedBackgroundBrush">#E6E9EE</SolidColorBrush>
+            <SolidColorBrush x:Key="SelectedBackgroundBrush">#1A0066FF</SolidColorBrush>
+            <SolidColorBrush x:Key="AccentSubtleBrush">#0F0066FF</SolidColorBrush>
+
+            <!-- 语义面板：浅底 + 深字，不描边。
+                 只有 Background 与 Text 两类：v3 不画边框，面板不需要 Border 色。 -->
+            <SolidColorBrush x:Key="SuccessPanelBackgroundBrush">#F0FDF4</SolidColorBrush>
+            <SolidColorBrush x:Key="SuccessPanelTextBrush">#14532D</SolidColorBrush>
+            <SolidColorBrush x:Key="WarningPanelBackgroundBrush">#FFFBEB</SolidColorBrush>
+            <SolidColorBrush x:Key="WarningPanelTextBrush">#92400E</SolidColorBrush>
+            <SolidColorBrush x:Key="WarningBackgroundAltBrush">#FEF3C7</SolidColorBrush>
+            <SolidColorBrush x:Key="InfoPanelBackgroundBrush">#EFF5FF</SolidColorBrush>
+            <SolidColorBrush x:Key="InfoPanelTextBrush">#1E40AF</SolidColorBrush>
+            <SolidColorBrush x:Key="DangerPanelBackgroundBrush">#FEF2F2</SolidColorBrush>
+            <SolidColorBrush x:Key="DangerPanelTextBrush">#991B1B</SolidColorBrush>
+            <SolidColorBrush x:Key="DangerPanelBackgroundStrongBrush">#FEE2E2</SolidColorBrush>
+            <!-- 涨跌标签字色：BullishBrush / BearishBrush 压在自己的 12% 色底上只有 3.3 / 2.9，
+                 12px 小字不达 AA，所以标签用同色相的深一档（浅色 5.0 / 6.2 以上，含次级面）。
+                 数值与图标仍用 BullishBrush / BearishBrush，保持全局“红涨绿跌”色相不变。 -->
+            <SolidColorBrush x:Key="BullishTagTextBrush">#BE2A30</SolidColorBrush>
+            <SolidColorBrush x:Key="BearishTagTextBrush">#166534</SolidColorBrush>
+            <!-- 错误色（浅色）：#DC2626 在白色卡片上对比度 4.83，达标 -->
+            <SolidColorBrush x:Key="ErrorBrush">#DC2626</SolidColorBrush>
+
+            <!-- 开关轨道（关）：需要比 BorderBrush 更明确，否则在白色卡片上读不出"这是个开关" -->
+            <SolidColorBrush x:Key="SwitchTrackOffBrush">#DDE1E7</SolidColorBrush>
+            <SolidColorBrush x:Key="SwitchTrackOffHoverBrush">#CED3DA</SolidColorBrush>
         </ResourceDictionary>
-        
-        <ResourceDictionary x:Key='Dark'>
-            <!-- 背景层级 - 蓝调深色四层体系（对齐设计系统 v2） -->
-            <SolidColorBrush x:Key='PageBackgroundBrush'>#0A0E17</SolidColorBrush>
-            <SolidColorBrush x:Key='CardBackgroundBrush'>#111722</SolidColorBrush>
-            <!-- 列表项背景 - 与卡片背景保持一致 -->
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#111722</SolidColorBrush>
-            <SolidColorBrush x:Key='SurfaceVariantBrush'>#1B2233</SolidColorBrush>
-            
-            <!-- 文本颜色 - 减轻长时间盯盘眩光 -->
-            <SolidColorBrush x:Key='TextPrimaryBrush'>#E4EAF5</SolidColorBrush>
-            <SolidColorBrush x:Key='TextSecondaryBrush'>#8894A8</SolidColorBrush>
-            <SolidColorBrush x:Key='TextDisabledBrush'>#5A6680</SolidColorBrush>
-            
-            <!-- 边框和分割线 -->
-            <SolidColorBrush x:Key='BorderBrush'>#1E2636</SolidColorBrush>
-            <SolidColorBrush x:Key='DividerBrush'>#182032</SolidColorBrush>
-            
-            <!-- 交互状态 - 选中态使用品牌蓝 15% 填充（bg-selected，对齐设计系统 v2.2） -->
-            <SolidColorBrush x:Key='HoverBackgroundBrush'>#161C2A</SolidColorBrush>
-            <SolidColorBrush x:Key='PressedBackgroundBrush'>#1B2233</SolidColorBrush>
-            <SolidColorBrush x:Key='SelectedBackgroundBrush'>#261976D2</SolidColorBrush>
-            <SolidColorBrush x:Key='ModeCardSelectedTextBrush'>#42A5F5</SolidColorBrush>
-            
-            <!-- 阴影颜色 -->
-            <SolidColorBrush x:Key='ShadowBrush'>#80000000</SolidColorBrush>
-            
-            <!-- 语义化容器背景 -->
-            <SolidColorBrush x:Key='DangerBackgroundBrush'>#2D1B1B</SolidColorBrush>
 
-            <!-- 语义面板：暗色下使用低透明度色块 + 高亮文字 -->
-            <SolidColorBrush x:Key='SuccessPanelBackgroundBrush'>#1E10B981</SolidColorBrush>
-            <SolidColorBrush x:Key='SuccessPanelBorderBrush'>#10B981</SolidColorBrush>
-            <SolidColorBrush x:Key='SuccessPanelTextBrush'>#34D399</SolidColorBrush>
-            <SolidColorBrush x:Key='WarningPanelBackgroundBrush'>#1EF59E0B</SolidColorBrush>
-            <SolidColorBrush x:Key='WarningPanelBorderBrush'>#F59E0B</SolidColorBrush>
-            <SolidColorBrush x:Key='WarningPanelTextBrush'>#FBBF24</SolidColorBrush>
-            <SolidColorBrush x:Key='InfoPanelBackgroundBrush'>#1E3B82F6</SolidColorBrush>
-            <SolidColorBrush x:Key='InfoPanelBorderBrush'>#3B82F6</SolidColorBrush>
-            <SolidColorBrush x:Key='InfoPanelTextBrush'>#93C5FD</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelBackgroundBrush'>#1EEF4444</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelBorderBrush'>#EF4444</SolidColorBrush>
-            <SolidColorBrush x:Key='BorderActiveBrush'>#42A5F5</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelBackgroundStrongBrush'>#2EEF4444</SolidColorBrush>
-            <SolidColorBrush x:Key='DangerPanelTextBrush'>#FCA5A5</SolidColorBrush>
+        <ResourceDictionary x:Key="Dark">
+            <!-- 表面色阶：纯中性灰，不用蓝调（暗色下蓝调会让中性面发脏） -->
+            <SolidColorBrush x:Key="PageBackgroundBrush">#0D0D0D</SolidColorBrush>
+            <SolidColorBrush x:Key="CardBackgroundBrush">#161616</SolidColorBrush>
+            <SolidColorBrush x:Key="ItemBackgroundBrush">#161616</SolidColorBrush>
+            <SolidColorBrush x:Key="SurfaceVariantBrush">#1C1C1C</SolidColorBrush>
+            <SolidColorBrush x:Key="SunkenBackgroundBrush">#101010</SolidColorBrush>
+            <!-- 骨架灰条：灰条带 0.55–0.95 的呼吸透明度，暗色下 SurfaceVariant(#1C1C1C) 与 #161616 卡片
+                 只差 6 级、叠透明度后几乎消失，所以单独取更亮一档（#262626，与浅色同级的可见度） -->
+            <SolidColorBrush x:Key="SkeletonBrush">#262626</SolidColorBrush>
+
+            <!-- 文字不提纯白（#EDEDED 而非 #FFFFFF），配合字重降档避免暗底发粗刺眼 -->
+            <SolidColorBrush x:Key="TextPrimaryBrush">#EDEDED</SolidColorBrush>
+            <SolidColorBrush x:Key="TextSecondaryBrush">#A0A0A0</SolidColorBrush>
+            <SolidColorBrush x:Key="TextDisabledBrush">#6E6E6E</SolidColorBrush>
+
+            <SolidColorBrush x:Key="BorderBrush">#262626</SolidColorBrush>
+            <SolidColorBrush x:Key="SubtleBorderBrush">#1F1F1F</SolidColorBrush>
+            <SolidColorBrush x:Key="DividerBrush">#262626</SolidColorBrush>
+
+            <SolidColorBrush x:Key="HoverBackgroundBrush">#1F1F1F</SolidColorBrush>
+            <SolidColorBrush x:Key="PressedBackgroundBrush">#262626</SolidColorBrush>
+            <SolidColorBrush x:Key="SelectedBackgroundBrush">#290066FF</SolidColorBrush>
+            <SolidColorBrush x:Key="AccentSubtleBrush">#140066FF</SolidColorBrush>
+
+            <!-- 暗色语义面板：低透明度色块 + 提亮文字，不描边 -->
+            <SolidColorBrush x:Key="SuccessPanelBackgroundBrush">#14251A</SolidColorBrush>
+            <SolidColorBrush x:Key="SuccessPanelTextBrush">#4ADE80</SolidColorBrush>
+            <SolidColorBrush x:Key="WarningPanelBackgroundBrush">#2A1F0F</SolidColorBrush>
+            <SolidColorBrush x:Key="WarningPanelTextBrush">#FBBF24</SolidColorBrush>
+            <SolidColorBrush x:Key="WarningBackgroundAltBrush">#33260F</SolidColorBrush>
+            <SolidColorBrush x:Key="InfoPanelBackgroundBrush">#101B2E</SolidColorBrush>
+            <SolidColorBrush x:Key="InfoPanelTextBrush">#83B6FF</SolidColorBrush>
+            <SolidColorBrush x:Key="DangerPanelBackgroundBrush">#2A1414</SolidColorBrush>
+            <SolidColorBrush x:Key="DangerPanelTextBrush">#FCA5A5</SolidColorBrush>
+            <SolidColorBrush x:Key="DangerPanelBackgroundStrongBrush">#3A1A1A</SolidColorBrush>
+            <!-- 暗色涨跌标签字色：提亮同色相，压在 12% 色底上 ≥ 5.4（BullishBrush 原值仅 3.9–4.1） -->
+            <SolidColorBrush x:Key="BullishTagTextBrush">#FF6B70</SolidColorBrush>
+            <SolidColorBrush x:Key="BearishTagTextBrush">#3FCF6F</SolidColorBrush>
+            <!-- 错误色（暗色）：#DC2626 在 #161616 卡片上仅 3.75，提亮到 #F87171 以满足正文 AA -->
+            <SolidColorBrush x:Key="ErrorBrush">#F87171</SolidColorBrush>
+
+            <!-- 开关轨道（关）：暗色下比 SurfaceVariant 再亮一档，才在 #161616 卡片上可见 -->
+            <SolidColorBrush x:Key="SwitchTrackOffBrush">#3A3A3A</SolidColorBrush>
+            <SolidColorBrush x:Key="SwitchTrackOffHoverBrush">#464646</SolidColorBrush>
         </ResourceDictionary>
+
     </ResourceDictionary.ThemeDictionaries>
 
-    <!-- 品牌色画刷 -->
-    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
-    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDark}"/>
-    <SolidColorBrush x:Key="PrimaryLightBrush" Color="{StaticResource PrimaryLight}"/>
-    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
-    <SolidColorBrush x:Key="SecondaryLightBrush" Color="{StaticResource SecondaryLight}"/>
-    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}"/>
+    <!-- ========== 强调色画刷 ========== -->
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}"/>
 
-    <!-- 功能性画刷 -->
-    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
-    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
-    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Error}"/>
-    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource Info}"/>
-
-    <!-- 功能色按钮交互状态画刷 -->
-    <SolidColorBrush x:Key="SuccessHoverBrush" Color="{StaticResource SuccessHover}"/>
-    <SolidColorBrush x:Key="SuccessPressedBrush" Color="{StaticResource SuccessPressed}"/>
-    <SolidColorBrush x:Key="WarningHoverBrush" Color="{StaticResource WarningHover}"/>
-    <SolidColorBrush x:Key="WarningPressedBrush" Color="{StaticResource WarningPressed}"/>
-    <SolidColorBrush x:Key="InfoHoverBrush" Color="{StaticResource InfoHover}"/>
-    <SolidColorBrush x:Key="InfoPressedBrush" Color="{StaticResource InfoPressed}"/>
-    
-    <!-- 股票专用画刷 - 语义化命名 -->
+    <!-- ========== 语义色画刷 ========== -->
     <SolidColorBrush x:Key="BullishBrush" Color="{StaticResource BullishRed}"/>
     <SolidColorBrush x:Key="BearishBrush" Color="{StaticResource BearishGreen}"/>
     <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource Neutral}"/>
-    
-    <!-- 向后兼容的别名 - 逐步迁移 -->
-    <SolidColorBrush x:Key="UpColorBrush" Color="{StaticResource BullishRed}"/>
-    <SolidColorBrush x:Key="DownColorBrush" Color="{StaticResource BearishGreen}"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
 
-    <!-- ========== 半透明背景色 ========== -->
+    <!-- 错误色按主题取值：暗色下 #DC2626 在卡片上对比度仅 3.75（低于正文 AA 4.5），
+         故暗色改用更亮的红 #F87171（实测 6.54）。定义在 ThemeDictionaries 中。 -->
+
+    <!-- ========== 遮罩 ========== -->
     <SolidColorBrush x:Key="DarkOverlayBrush" Color="#80000000"/>
-    <SolidColorBrush x:Key="LightOverlayBrush" Color="#40FFFFFF"/>
 
-    <!-- ========== 强调底色上的前景文字（on-color） ========== -->
-    <!-- 用于品牌蓝/功能色实底上的白字（按钮、徽章、头像、涨跌标签等），明暗主题同值 -->
+    <!-- 强调实底上的前景文字（按钮、徽章、涨跌标签），明暗同值 -->
     <SolidColorBrush x:Key="TextOnEmphasisBrush" Color="#FFFFFF"/>
-    
-    <!-- ========== 通知窗口专用颜色 - 蓝调深色体系（对齐设计系统 v2.2） ========== -->
-    <Color x:Key="NotificationDarkBackground">#161C2A</Color>
-    <Color x:Key="NotificationDarkBorder">#1E2636</Color>
-    <Color x:Key="NotificationDarkHover">#1B2233</Color>
-    <Color x:Key="NotificationDarkPressed">#20293D</Color>
-    <Color x:Key="NotificationIconSuccess">#10B981</Color>
-    <Color x:Key="NotificationTextLight">#FFFFFF</Color>
-    <Color x:Key="NotificationTextSecondary">#8894A8</Color>
-    <Color x:Key="NotificationShadow">#60000000</Color>
-    
+
+    <!-- ========== 通知窗口（跟随暗色中性阶，去边框） ========== -->
+    <Color x:Key="NotificationDarkBackground">#1C1C1C</Color>
+    <Color x:Key="NotificationDarkHover">#262626</Color>
+    <Color x:Key="NotificationDarkPressed">#303030</Color>
+    <Color x:Key="NotificationTextLight">#EDEDED</Color>
+    <Color x:Key="NotificationTextSecondary">#A0A0A0</Color>
+
     <SolidColorBrush x:Key="NotificationDarkBackgroundBrush" Color="{StaticResource NotificationDarkBackground}"/>
-    <SolidColorBrush x:Key="NotificationDarkBorderBrush" Color="{StaticResource NotificationDarkBorder}"/>
     <SolidColorBrush x:Key="NotificationDarkHoverBrush" Color="{StaticResource NotificationDarkHover}"/>
     <SolidColorBrush x:Key="NotificationDarkPressedBrush" Color="{StaticResource NotificationDarkPressed}"/>
-    <SolidColorBrush x:Key="NotificationIconSuccessBrush" Color="{StaticResource NotificationIconSuccess}"/>
     <SolidColorBrush x:Key="NotificationTextLightBrush" Color="{StaticResource NotificationTextLight}"/>
     <SolidColorBrush x:Key="NotificationTextSecondaryBrush" Color="{StaticResource NotificationTextSecondary}"/>
-    
-    <!-- ========== 阴影定义 ========== -->
-    <BoxShadows x:Key="NotificationBoxShadow">0 4 16 0 #60000000</BoxShadows>
-    <BoxShadows x:Key="ElevatedBoxShadow">0 8 32 0 #30000000</BoxShadows>
-    <BoxShadows x:Key="CardBoxShadow">0 2 8 0 #15000000</BoxShadows>
-    <BoxShadows x:Key="SubtleBoxShadow">0 2 8 0 #10000000</BoxShadows>
-    <BoxShadows x:Key="SmallBoxShadow">0 1 3 0 #20000000</BoxShadows>
-    <BoxShadows x:Key="SidebarBoxShadow">-4 0 16 0 #40000000</BoxShadows>
-    <BoxShadows x:Key="InputAreaBoxShadow">0 -2 8 0 #08000000</BoxShadows>
-    <BoxShadows x:Key="UserBubbleBoxShadow">0 2 4 0 #301976D2</BoxShadows>
-    
 
 </ResourceDictionary>

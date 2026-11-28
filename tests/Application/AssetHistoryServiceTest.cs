@@ -113,4 +113,16 @@ public class AssetHistoryServiceTest
         Assert.AreEqual("SH600519", aShareHistory[0].Code);
         Assert.AreEqual("BTCUSDT", cryptoHistory[0].Code);
     }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetHistory_WhenCancelled_ShouldThrowInsteadOfReturningEmpty()
+    {
+        var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.GetHistoryAsync(cts.Token));
+    }
 }

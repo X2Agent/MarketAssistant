@@ -31,7 +31,7 @@ public class DocxMarkdownConverter(IImageStorageService imageStorageService) : I
         public int ImageCounter;
     }
 
-    private readonly IImageStorageService _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
+    private readonly IImageStorageService _imageStorageService = imageStorageService;
 
     public bool CanConvert(string filePath) =>
         filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);

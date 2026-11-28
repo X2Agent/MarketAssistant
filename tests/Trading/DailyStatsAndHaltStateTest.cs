@@ -170,7 +170,7 @@ public sealed class DailyStatsAndHaltStateTest
             exchangeClient.Object,
             haltState,
             apiHealth,
-            NullLogger<RiskManager>.Instance);
+            NullLogger<RiskManager>.Instance, null, null);
 
         // 1. 连续亏损熔断
         dataService
@@ -241,6 +241,11 @@ public sealed class DailyStatsAndHaltStateTest
     {
         var exchangeClient = new Mock<IExchangeClient>();
         exchangeClient.SetupGet(c => c.IsFutures).Returns(false);
+        exchangeClient.Setup(c => c.GetAccountInfoAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ExchangeAccountInfo
+            {
+                Balances = [new ExchangeBalance { Asset = "BTC", Free = 2m, Locked = 0m }]
+            });
 
         var portfolioService = new Mock<CryptoPortfolioService>(null!, null!, null!, null!, null!, NullLogger<CryptoPortfolioService>.Instance);
         portfolioService
@@ -289,7 +294,7 @@ public sealed class DailyStatsAndHaltStateTest
             exchangeClient.Object,
             haltState,
             new ApiHealthMonitor(),
-            NullLogger<RiskManager>.Instance);
+            NullLogger<RiskManager>.Instance, null, null);
 
         // 1. 开仓单被熔断拒绝
         var openResult = await riskManager.ValidateOrderAsync("BTCUSDT", OrderSide.Buy, 1m, 100m, OrderType.Limit);
@@ -365,6 +370,22 @@ public sealed class DailyStatsAndHaltStateTest
                 ExchangeOrderId = 88801
             };
             await records.SaveTradeRecordAsync(pendingSell);
+            var partial = new ExchangeOrderResult { OrderId = "88801", Status = "PARTIALLY_FILLED", ExecutedQty = 0.5m, CumulativeQuoteQty = 55m };
+            await using (var fault = new SqliteConnection($"Data Source={tempDbPath}"))
+            {
+                await fault.OpenAsync();
+                using var cmd = fault.CreateCommand();
+                cmd.CommandText = "CREATE TRIGGER reject_order_update BEFORE UPDATE ON trade_records BEGIN SELECT RAISE(ABORT, 'injected failure'); END";
+                await cmd.ExecuteNonQueryAsync();
+                await Assert.ThrowsExactlyAsync<SqliteException>(() => records.ReconcileTradeRecordAsync(pendingSell, partial));
+                Assert.AreEqual(1m, (await positions.GetOpenPositionsAsync("BTCUSDT")).Single().RemainingQuantity);
+                Assert.AreEqual(0, (await dailyStats.GetTodayStatsAsync()).TradeCount);
+                cmd.CommandText = "DROP TRIGGER reject_order_update";
+                await cmd.ExecuteNonQueryAsync();
+            }
+            Assert.AreEqual(5m, (await records.ReconcileTradeRecordAsync(pendingSell, partial)).RealizedPnl);
+            await records.ReconcileTradeRecordAsync(pendingSell, partial);
+            Assert.AreEqual(0.5m, (await positions.GetOpenPositionsAsync("BTCUSDT")).Single().RemainingQuantity);
 
             // 3. 异步对账成交：卖出 1 BTC @ 120 USDT → FIFO 已实现盈亏应为 (120 - 100) * 1 = 20
             var reconciled = await records.ReconcileTradeRecordAsync(pendingSell, new ExchangeOrderResult

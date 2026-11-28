@@ -41,8 +41,6 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
 
     public async Task ReplaceAsync(RagDocumentCatalogEntry entry, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(entry);
-
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         await using var conn = await CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var cmd = conn.CreateCommand();

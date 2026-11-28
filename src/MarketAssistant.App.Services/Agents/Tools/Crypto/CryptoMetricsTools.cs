@@ -5,6 +5,7 @@ using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Market;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.DataProviders;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,12 +32,12 @@ public sealed class CryptoMetricsTools(
     [FromKeyedServices(MarketType.Crypto)] ITickTradeService tickTradeService,
     ILogger<CryptoMetricsTools> logger) : IFinancialTools
 {
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-    private readonly IKLineService _klineService = klineService ?? throw new ArgumentNullException(nameof(klineService));
-    private readonly IOrderBookService _orderBookService = orderBookService ?? throw new ArgumentNullException(nameof(orderBookService));
-    private readonly ITickTradeService _tickTradeService = tickTradeService ?? throw new ArgumentNullException(nameof(tickTradeService));
-    private readonly ILogger<CryptoMetricsTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly BinanceMarketDataService _binanceService = binanceService;
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService;
+    private readonly IKLineService _klineService = klineService;
+    private readonly IOrderBookService _orderBookService = orderBookService;
+    private readonly ITickTradeService _tickTradeService = tickTradeService;
+    private readonly ILogger<CryptoMetricsTools> _logger = logger;
 
     // ==================== 市场深度数据（币安） ====================
 
@@ -44,7 +45,7 @@ public sealed class CryptoMetricsTools(
     public async Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null, CancellationToken cancellationToken = default)
     {
         var intervalStr = ToBinanceInterval(interval);
-        try
+        return await ToolExecutor.ExecuteAsync("获取K线数据", symbol, _logger, async _ =>
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
@@ -105,17 +106,7 @@ public sealed class CryptoMetricsTools(
                 Interval = intervalStr,
                 Candles = candles
             };
-        }
-        catch (OperationCanceledException)
-        {
-            // 用户取消必须向上传播，不得包装成业务错误
-            throw;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取K线数据失败: {Symbol}, Interval: {Interval}", symbol, intervalStr);
-            throw new FriendlyException($"获取K线数据失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     private static bool TryToKLineType(MarketInterval interval, out KLineType klineType)
@@ -194,7 +185,7 @@ public sealed class CryptoMetricsTools(
     [Description("获取订单簿深度数据，包括买卖盘挂单，用于分析支撑压力位。limit通常为20/50/100")]
     public async Task<CryptoOrderBookDepth> GetOrderBookDepthAsync(string symbol, int limit = 100, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取订单簿深度", symbol, _logger, async _ =>
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
@@ -211,23 +202,13 @@ public sealed class CryptoMetricsTools(
                 Bids = [.. snapshot.Bids.Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })],
                 Asks = [.. snapshot.Asks.Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })]
             };
-        }
-        catch (OperationCanceledException)
-        {
-            // 用户取消必须向上传播，不得包装成业务错误
-            throw;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取订单簿深度失败: {Symbol}", symbol);
-            throw new FriendlyException($"获取订单簿深度失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     [Description("获取最近成交记录，分析主动买入/卖出力量对比")]
     public async Task<CryptoRecentTrades> GetRecentTradesAsync(string symbol, int limit = 500, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取最近成交", symbol, _logger, async _ =>
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
@@ -262,17 +243,7 @@ public sealed class CryptoMetricsTools(
                 BuyerVolumePercent = totalVolume > 0 ? buyVolume / totalVolume * 100 : 0,
                 SellerVolumePercent = totalVolume > 0 ? sellVolume / totalVolume * 100 : 0
             };
-        }
-        catch (OperationCanceledException)
-        {
-            // 用户取消必须向上传播，不得包装成业务错误
-            throw;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取最近成交失败: {Symbol}", symbol);
-            throw new FriendlyException($"获取最近成交失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     // ==================== 综合市场指标（CoinGecko） ====================
@@ -280,7 +251,7 @@ public sealed class CryptoMetricsTools(
     [Description("获取CoinGecko全方位市场数据：市值、FDV、ATH/ATL、历史排名等")]
     public async Task<CryptoMarketMetrics> GetMarketMetricsAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取市场指标", symbol, _logger, async _ =>
         {
             var coinId = await GetCoinGeckoIdAsync(symbol, cancellationToken);
 
@@ -316,23 +287,13 @@ public sealed class CryptoMetricsTools(
                 AtlChangePercent = data["atl_change_percentage"]?.GetValue<decimal?>(),
                 LastUpdated = data["last_updated"]?.GetValue<DateTime>() ?? DateTime.UtcNow
             };
-        }
-        catch (OperationCanceledException)
-        {
-            // 用户取消必须向上传播，不得包装成业务错误
-            throw;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取市场指标失败: {Symbol}", symbol);
-            throw new FriendlyException($"获取市场指标失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     [Description("获取代币在不同交易所的交易量分布情况，用于分析流动性分布")]
     public async Task<List<VolumeDistribution>> GetVolumeDistributionAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync<List<VolumeDistribution>>("获取交易量分布", symbol, _logger, async _ =>
         {
             var coinId = await GetCoinGeckoIdAsync(symbol, cancellationToken);
 
@@ -365,17 +326,7 @@ public sealed class CryptoMetricsTools(
                     Percentage = (decimal)(x.Volume / totalVolume * 100),
                     PairCount = x.PairCount
                 })];
-        }
-        catch (OperationCanceledException)
-        {
-            // 用户取消必须向上传播，不得包装成业务错误
-            throw;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取交易量分布失败: {Symbol}", symbol);
-            throw new FriendlyException($"获取交易量分布失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
     /// <summary>
     /// 以 InvariantCulture 解析币安返回的数值字符串。
@@ -388,10 +339,11 @@ public sealed class CryptoMetricsTools(
     [Description("获取波动性指标，包括历史波动率、ATR、最大回撤、夏普比率等，用于风险评估")]
     public async Task<CryptoVolatilityMetrics> GetVolatilityMetricsAsync(string symbol, int days = 30, CancellationToken cancellationToken = default)
     {
-        try
+        // days 由 LLM 传入，钳制到合理区间：过小会导致样本数不足除零，过大会拉取过量数据
+        days = Math.Clamp(days, 3, 365);
+
+        return await ToolExecutor.ExecuteAsync("获取波动性指标", symbol, _logger, async _ =>
         {
-            // days 由 LLM 传入，钳制到合理区间：过小会导致样本数不足除零，过大会拉取过量数据
-            days = Math.Clamp(days, 3, 365);
 
             // 获取历史K线数据
             var ohlcv = await GetOHLCVAsync(symbol, MarketInterval.OneDay, days + 1, cancellationToken: cancellationToken);
@@ -485,21 +437,7 @@ public sealed class CryptoMetricsTools(
                 StandardDeviation = stdDev * 100,
                 AverageReturn = avgReturn * 100
             };
-        }
-        catch (OperationCanceledException)
-        {
-            // 内层 GetOHLCVAsync 已透传取消，此处不得再包装成业务错误
-            throw;
-        }
-        catch (FriendlyException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "获取波动性指标失败: {Symbol}", symbol);
-            throw new FriendlyException($"获取波动性指标失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     // ==================== AI Functions ====================
@@ -518,42 +456,31 @@ public sealed class CryptoMetricsTools(
 
     private async Task<string> GetCoinGeckoIdAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        try
+        // 1. 预处理：如果是交易对格式（如 BTC/USDT），先提取基础币种（BTC）
+        // 使用 ToBinanceFormat 清理分隔符，再提取 BaseCurrency
+        var cleanSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
+        var searchSymbol = CryptoSymbolConverter.ExtractBaseCurrency(cleanSymbol);
+
+        // 2. 优先查询内置静态映射，避免消耗 CoinGecko 搜索接口限流配额
+        if (CryptoSymbolConverter.TryGetCoinGeckoId(searchSymbol, out var mappedId))
         {
-            // 1. 预处理：如果是交易对格式（如 BTC/USDT），先提取基础币种（BTC）
-            // 使用 ToBinanceFormat 清理分隔符，再提取 BaseCurrency
-            var cleanSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
-            var searchSymbol = CryptoSymbolConverter.ExtractBaseCurrency(cleanSymbol);
-
-            // 2. 优先查询内置静态映射，避免消耗 CoinGecko 搜索接口限流配额
-            if (CryptoSymbolConverter.TryGetCoinGeckoId(searchSymbol, out var mappedId))
-            {
-                return mappedId;
-            }
-
-            // 3. 搜索 CoinGecko
-            var response = await _coinGeckoService.SearchCoinsAsync(searchSymbol, cancellationToken);
-
-            var coin = response?.Coins?.FirstOrDefault(c =>
-                c.Symbol?.Equals(searchSymbol, StringComparison.OrdinalIgnoreCase) == true);
-
-            if (coin != null)
-            {
-                return coin.Id;
-            }
-
-            // 4. Fallback: 使用提取后的符号转 CoinGecko ID
-            _logger.LogWarning("未找到代币 {Symbol} ({SearchSymbol}) 的CoinGecko ID，使用静态规则作为fallback", symbol, searchSymbol);
-            return CryptoSymbolConverter.ToCoinGeckoId(searchSymbol);
+            return mappedId;
         }
-        catch (OperationCanceledException)
+
+        // 3. 搜索 CoinGecko
+        var response = await _coinGeckoService.SearchCoinsAsync(searchSymbol, cancellationToken);
+
+        var coin = response?.Coins?.FirstOrDefault(c =>
+            c.Symbol?.Equals(searchSymbol, StringComparison.OrdinalIgnoreCase) == true);
+
+        if (coin != null)
         {
-            throw;
+            return coin.Id;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "搜索CoinGecko ID失败: {Symbol}", symbol);
-            return CryptoSymbolConverter.ToCoinGeckoId(symbol);
-        }
+
+        // 4. 搜索正常但无匹配：退回确定性映射规则（属"查无数据"，非失败掩盖；
+        //    搜索接口故障则向上抛出，由 ToolExecutor 转 FriendlyException）
+        _logger.LogWarning("未找到代币 {Symbol} ({SearchSymbol}) 的CoinGecko ID，使用静态规则作为fallback", symbol, searchSymbol);
+        return CryptoSymbolConverter.ToCoinGeckoId(searchSymbol);
     }
 }

@@ -2,9 +2,7 @@ using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.InvestmentSelection.Models;
-using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection;
@@ -15,21 +13,22 @@ namespace MarketAssistant.Agents.InvestmentSelection;
 /// </summary>
 /// <remarks>
 /// 与 MarketAnalysisWorkflow 对齐：4 个 Executor 均为 Transient 注册，
-/// 由 <see cref="IInvestmentExecutorFactory"/> 在每次 Run 内重新创建，
+/// 由工作流在每次 Run 内从容器重新解析，
 /// 避免 Singleton Executor 在并发分析间共享可变状态与模型/运行时引用。
 /// </remarks>
 public class InvestmentSelectionWorkflow(
-    IInvestmentExecutorFactory executorFactory,
+    IServiceProvider serviceProvider,
     ILogger<InvestmentSelectionWorkflow> logger)
 {
-    private readonly IInvestmentExecutorFactory _executorFactory = executorFactory ?? throw new ArgumentNullException(nameof(executorFactory));
-    private readonly ILogger<InvestmentSelectionWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly ILogger<InvestmentSelectionWorkflow> _logger = logger;
 
     /// <summary>
-    /// 执行基于用户需求的 AI 投资分析。
+    /// 执行基于用户需求的 AI 投资分析；<paramref name="progress"/> 接收三步骤的开始/完成事件。
     /// </summary>
     public async Task<InvestmentSelectionResult> AnalyzeUserRequirementAsync(
         InvestmentRecommendationRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var workflowRequest = new InvestmentSelectionWorkflowRequest
@@ -38,21 +37,18 @@ public class InvestmentSelectionWorkflow(
             IsNewsAnalysis = false,
             Content = request.UserRequirements,
             RiskPreference = request.RiskPreference,
-            InvestmentAmount = request.InvestmentAmount,
-            InvestmentHorizon = request.InvestmentHorizon,
-            PreferredSectors = request.PreferredSectors,
-            ExcludedSectors = request.ExcludedSectors,
             MaxRecommendations = request.MaxRecommendations
         };
 
-        return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
+        return await ExecuteWorkflowAsync(workflowRequest, progress, cancellationToken);
     }
 
     /// <summary>
-    /// 执行基于新闻内容的 AI 投资分析。
+    /// 执行基于新闻内容的 AI 投资分析；<paramref name="progress"/> 接收三步骤的开始/完成事件。
     /// </summary>
     public async Task<InvestmentSelectionResult> AnalyzeNewsHotspotAsync(
         NewsBasedInvestmentRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var workflowRequest = new InvestmentSelectionWorkflowRequest
@@ -63,11 +59,12 @@ public class InvestmentSelectionWorkflow(
             MaxRecommendations = request.MaxRecommendations
         };
 
-        return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
+        return await ExecuteWorkflowAsync(workflowRequest, progress, cancellationToken);
     }
 
     private async Task<InvestmentSelectionResult> ExecuteWorkflowAsync(
         InvestmentSelectionWorkflowRequest request,
+        IProgress<InvestmentSelectionProgress>? progress,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation(
@@ -76,10 +73,10 @@ public class InvestmentSelectionWorkflow(
             request.IsNewsAnalysis ? "新闻热点" : "用户需求");
 
         // 每次运行新建 Executor 实例（Transient），避免并发 Run 间共享状态
-        var generateStockCriteriaExecutor = _executorFactory.CreateStockCriteriaExecutor();
-        var generateCryptoCriteriaExecutor = _executorFactory.CreateCryptoCriteriaExecutor();
-        var screenTargetsExecutor = _executorFactory.CreateScreenTargetsExecutor();
-        var analyzeAssetsExecutor = _executorFactory.CreateAnalyzeAssetsExecutor();
+        var generateStockCriteriaExecutor = _serviceProvider.GetRequiredService<GenerateCriteriaExecutor<StockCriteria>>();
+        var generateCryptoCriteriaExecutor = _serviceProvider.GetRequiredService<GenerateCriteriaExecutor<CryptoCriteria>>();
+        var screenTargetsExecutor = _serviceProvider.GetRequiredService<ScreenInvestmentTargetsExecutor>();
+        var analyzeAssetsExecutor = _serviceProvider.GetRequiredService<AnalyzeAssetsExecutor>();
 
         WorkflowBuilder workflowBuilder = request.MarketType switch
         {
@@ -97,23 +94,42 @@ public class InvestmentSelectionWorkflow(
         };
 
         var workflow = workflowBuilder.Build();
-        await using Run run = await InProcessExecution.RunAsync(
+        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             request,
             cancellationToken: cancellationToken);
 
         InvestmentSelectionResult? finalResult = null;
+        string? lastEvent = null;
 
-        foreach (WorkflowEvent evt in run.NewEvents)
+        await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
         {
+            lastEvent = evt is ExecutorEvent executorEvent
+                ? $"{evt.GetType().Name}({executorEvent.ExecutorId})"
+                : evt.GetType().Name;
+
             switch (evt)
             {
                 case ExecutorInvokedEvent executorInvoked:
                     _logger.LogInformation("步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                    if (ToStep(executorInvoked.ExecutorId) is { } startedStep)
+                    {
+                        progress?.Report(new InvestmentSelectionProgress(
+                            startedStep, InvestmentSelectionStepStatus.Running));
+                    }
                     break;
                 case ExecutorCompletedEvent executorCompleted:
                     _logger.LogInformation("步骤完成: {ExecutorId}", executorCompleted.ExecutorId);
+                    if (ToStep(executorCompleted.ExecutorId) is { } completedStep)
+                    {
+                        progress?.Report(new InvestmentSelectionProgress(
+                            completedStep,
+                            InvestmentSelectionStepStatus.Completed,
+                            DescribeStepResult(executorCompleted.Data)));
+                    }
                     break;
+                // AgentResponseUpdateEvent 继承自 WorkflowOutputEvent，必须在其之前匹配，
+                // 否则 LLM 的中间流式更新会被误当作最终输出。
                 case AgentResponseUpdateEvent:
                     break;
                 case WorkflowOutputEvent workflowOutput:
@@ -146,8 +162,30 @@ public class InvestmentSelectionWorkflow(
         // 事件流未产出结果说明工作流中途失败（各 Executor 已把异常包装上抛），
         // 把"失败"伪装成结构完整的默认结果会让用户误以为"AI 认为没有合适标的"
         if (finalResult == null)
+        {
+            // 这种失败日志里没有任何步骤失败事件，最后一个事件是唯一线索
+            _logger.LogError("投资选择工作流事件流结束但没有输出，最后一个事件: {LastEvent}", lastEvent);
             throw new FriendlyException("投资选择工作流未返回结果，分析未完成，请重试。");
+        }
 
         return finalResult;
     }
+
+    private static InvestmentSelectionStep? ToStep(string executorId)
+    {
+        if (executorId.StartsWith("GenerateCriteria", StringComparison.Ordinal))
+            return InvestmentSelectionStep.GenerateCriteria;
+        if (executorId.StartsWith("ScreenInvestmentTargets", StringComparison.Ordinal))
+            return InvestmentSelectionStep.ScreenTargets;
+        if (executorId.StartsWith("AnalyzeAssets", StringComparison.Ordinal))
+            return InvestmentSelectionStep.AnalyzeAssets;
+        return null;
+    }
+
+    private static string? DescribeStepResult(object? data) => data switch
+    {
+        CriteriaGenerationResult { CriteriaCount: > 0 } criteria => $"已生成 {criteria.CriteriaCount} 个筛选条件",
+        AssetScreeningResult screening => $"候选 {screening.ScreenedAssets.Count} 个标的",
+        _ => null
+    };
 }

@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converters="using:MarketAssistant.Converters"
+             xmlns:models="using:MarketAssistant.Trading.Models"
+             mc:Ignorable="d" d:DesignWidth="800"
+             x:Class="MarketAssistant.Views.Components.Trading.TradeRecordRowView"
+             x:DataType="models:TradeRecord">
+
+    <!-- 交易记录行：交易历史页与策略执行历史窗口共用。
+         头部讲“这是哪一笔”：交易对 + 买卖方向 + 订单类型 + 状态，右侧是已实现盈亏与时间；
+         明细只展示这笔记录真有的字段（取消 / 失败且无成交时不再写“成交 0 @ 0 · 手续费 0”）。 -->
+    <UserControl.Resources>
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
+        <converters:PriceChangeColorConverter x:Key="PnlColorConverter"/>
+    </UserControl.Resources>
+
+    <controls:CardView Margin="{StaticResource TinyBottomMargin}">
+        <StackPanel Spacing="{StaticResource SmallSpacing}">
+
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                    <TextBlock Text="{Binding Symbol}"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightTitle}"
+                               VerticalAlignment="Center"/>
+                    <controls:StatusTag Text="{Binding Side, Converter={StaticResource EnumDescriptionConverter}}"
+                                        Classes.bullish="{Binding Side, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:OrderSide.Buy}}"
+                                        Classes.bearish="{Binding Side, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:OrderSide.Sell}}"/>
+                    <controls:StatusTag Text="{Binding OrderType, Converter={StaticResource EnumDescriptionConverter}}"/>
+                    <!-- 状态：已成交绿、部分成交橙、待成交蓝、失败红，已取消保持中性 -->
+                    <controls:StatusTag Text="{Binding Status, Converter={StaticResource EnumDescriptionConverter}}"
+                                        Classes.success="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:TradeRecordStatus.Filled}}"
+                                        Classes.warning="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:TradeRecordStatus.PartiallyFilled}}"
+                                        Classes.info="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:TradeRecordStatus.Pending}}"
+                                        Classes.danger="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:TradeRecordStatus.Failed}}"/>
+                </StackPanel>
+
+                <!-- 已实现盈亏是该行最重要的数字，单独右对齐；开仓成交没有盈亏，整块隐藏 -->
+                <TextBlock Grid.Column="1"
+                           Classes="num"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Foreground="{Binding RealizedPnl, Converter={StaticResource PnlColorConverter}}"
+                           Text="{Binding RealizedPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"
+                           IsVisible="{Binding HasRealizedPnl}"/>
+
+                <TextBlock Grid.Column="2"
+                           Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
+            </Grid>
+
+            <!-- 明细：请求量 / 成交量与均价 / 手续费 / 滑点，缺哪项隐藏哪项 -->
+            <WrapPanel Classes="meta">
+                <TextBlock>
+                    <Run Text="请求 "/><Run Text="{Binding RequestedQty, StringFormat={}{0:0.########}}"/>
+                </TextBlock>
+                <TextBlock IsVisible="{Binding HasFill}">
+                    <Run Text=" · 成交 "/><Run Text="{Binding ExecutedQty, StringFormat={}{0:0.########}}"/><Run Text=" @ "/><Run Text="{Binding ExecutedPrice, Converter={StaticResource PriceTextConverter}}"/>
+                </TextBlock>
+                <TextBlock IsVisible="{Binding HasCommission}">
+                    <Run Text=" · 手续费 "/><Run Text="{Binding Commission, StringFormat={}{0:0.########}}"/><Run Text=" "/><Run Text="{Binding CommissionAsset}"/>
+                </TextBlock>
+                <TextBlock IsVisible="{Binding HasSlippage}">
+                    <Run Text=" · 滑点 "/><Run Text="{Binding SlippagePercent, StringFormat={}{0:F3}%}"/>
+                </TextBlock>
+            </WrapPanel>
+
+            <!-- AI 决策推理：默认折叠，不占列表高度 -->
+            <Expander Classes="inline"
+                      Header="AI 决策推理"
+                      IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                      HorizontalAlignment="Stretch">
+                <TextBlock Text="{Binding AIReasoning}"
+                           TextWrapping="Wrap"
+                           Classes="caption"
+                           Margin="{StaticResource TinyTopMargin}"/>
+            </Expander>
+        </StackPanel>
+    </controls:CardView>
+</UserControl>

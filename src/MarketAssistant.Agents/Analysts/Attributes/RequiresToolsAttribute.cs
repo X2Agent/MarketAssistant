@@ -7,5 +7,5 @@ namespace MarketAssistant.Agents.Analysts.Attributes;
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = true)]
 public sealed class RequiresToolsAttribute(Type toolInterfaceType) : Attribute
 {
-    public Type ToolInterfaceType { get; } = toolInterfaceType ?? throw new ArgumentNullException(nameof(toolInterfaceType));
+    public Type ToolInterfaceType { get; } = toolInterfaceType;
 }

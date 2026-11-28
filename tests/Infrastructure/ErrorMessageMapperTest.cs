@@ -58,6 +58,37 @@ public sealed class ErrorMessageMapperTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public void ProviderError_FreeModelDailyQuota_ShouldExplainResetTimeAndNextSteps()
+    {
+        // 实测原文（OpenRouter 免费模型日配额）：状态行无信息量，正文为英文且不含重置时间
+        var raw = "HTTP 429 (: )\n\nRate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day: https://openrouter.ai/settings/credits?utm_source=api&utm_campaign=free_daily_limit";
+        var mapped = ErrorMessageMapper.GetUserFriendlyMessage(new ClientResultException(raw));
+
+        StringAssert.Contains(mapped, "今日请求额度已用完");
+        StringAssert.Contains(mapped, "08:00", "须告知额度何时重置");
+        StringAssert.Contains(mapped, "付费模型", "须给出可操作的处理建议");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void TryGetProviderErrorMessage_ShouldOnlyMapProviderErrors()
+    {
+        var isProviderError = ErrorMessageMapper.TryGetProviderErrorMessage(
+            new ClientResultException("HTTP 404 (: )\nmodel gone"), out var providerMessage);
+
+        Assert.IsTrue(isProviderError);
+        StringAssert.Contains(providerMessage, "model gone");
+
+        // 其他异常必须让调用方保留自己的 Message：通用映射会把 InvalidOperationException 换成泛化文案
+        var isOtherProviderError = ErrorMessageMapper.TryGetProviderErrorMessage(
+            new InvalidOperationException("模型未返回任何文本结论"), out var otherMessage);
+
+        Assert.IsFalse(isOtherProviderError);
+        Assert.IsNull(otherMessage);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public void FriendlyException_ShouldPassThroughUnchanged()
     {
         var mapped = ErrorMessageMapper.GetUserFriendlyMessage(

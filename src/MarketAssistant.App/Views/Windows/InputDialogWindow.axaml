@@ -1,24 +1,29 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="MarketAssistant.Views.Windows.InputDialogWindow"
-        Width="{StaticResource DialogWidth}"
-        MinWidth="350"
+        Width="{StaticResource DialogCardWidth}"
+        MinWidth="360"
+        MaxWidth="560"
         SizeToContent="Height"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource PageBackgroundBrush}">
 
-    <Border Padding="{StaticResource CardPadding}">
-        <StackPanel Spacing="{StaticResource SmallSpacing}">
+    <!-- 居中卡片规范：宽 440，内边距 24，圆角 12，无边框 -->
+    <Border Background="{DynamicResource CardBackgroundBrush}"
+            CornerRadius="{StaticResource CardCornerRadius}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            Padding="{StaticResource PagePadding}"
+            Margin="{StaticResource PagePaddingCompact}">
+        <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
             <!-- 提示信息 -->
             <TextBlock Name="PromptText"
                        TextWrapping="Wrap"
-                       FontSize="{StaticResource LabelFontSize}"
-                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                       Classes="body"/>
 
-            <!-- 输入框 -->
+            <!-- 输入框：聚焦走双环，不画亮线 -->
             <TextBox Name="InputTextBox"
                      PlaceholderText="请输入..."/>
 
@@ -27,18 +32,16 @@
                         HorizontalAlignment="Right"
                         Spacing="{StaticResource SmallSpacing}"
                         Margin="{StaticResource TinyTopMargin}">
-                <Button Name="OkButton"
-                        Content="确定"
-                        Classes="btn-primary"
-                        MinWidth="{StaticResource SmallButtonMinWidth}"
-                        Padding="{StaticResource PagePadding}"
-                        Click="OnOkClick"/>
                 <Button Name="CancelButton"
                         Content="取消"
                         Classes="btn-secondary"
                         MinWidth="{StaticResource SmallButtonMinWidth}"
-                        Padding="{StaticResource PagePadding}"
                         Click="OnCancelClick"/>
+                <Button Name="OkButton"
+                        Content="确定"
+                        Classes="btn-primary"
+                        MinWidth="{StaticResource SmallButtonMinWidth}"
+                        Click="OnOkClick"/>
             </StackPanel>
         </StackPanel>
     </Border>

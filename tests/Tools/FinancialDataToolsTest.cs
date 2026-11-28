@@ -1,11 +1,10 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.AShare;
-using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services;
 using MarketAssistant.DataProviders.AShare;
+using MarketAssistant.Services;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,7 +13,7 @@ using Moq;
 namespace TestMarketAssistant.Tools;
 
 /// <summary>
-/// IShareFinancialTools 接口测试(仅测试 A股 实现,虚拟币已改用 ICryptoMetricsTools)
+/// IFinancialTools 接口测试（A 股实现）：五个单表工具的真实数据验证（数据源真实返回 + 会计勾稽关系）。
 /// </summary>
 [TestClass]
 [TestCategory("Integration")]
@@ -28,7 +27,9 @@ public class FinancialDataToolsTest
     [TestInitialize]
     public void Setup()
     {
-        // 从环境变量读取智兔 API 令牌（不在代码中硬编码，避免提交到仓库）
+        // 从环境变量读取智兔 API 令牌（不在代码中硬编码，避免提交到仓库）。
+        // 刻意不回退到应用运行时配置：AppInfo.AppDataDirectory 基于 EntryAssembly 解析，
+        // 在测试宿主下会指向错误目录，读不到也不可靠；且测试不应依赖某台机器上的加密存储。
         _zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN");
 
         var services = new ServiceCollection();
@@ -69,7 +70,7 @@ public class FinancialDataToolsTest
     }
 
     /// <summary>
-    /// 断言智兔 API 令牌已配置（缺失则测试失败，而非跳过）
+    /// 断言智兔 API 令牌已配置（缺失则跳过，而非失败）。
     /// </summary>
     private void RequireZhiTuToken()
     {
@@ -79,22 +80,20 @@ public class FinancialDataToolsTest
         }
     }
 
-    #region A股财务数据测试
+    private AShareFinancialTools GetService()
+        => (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
+
+    #region 单表工具：数据正确性
 
     [TestMethod]
     [TestCategory("Integration")]
     public async Task GetBalanceSheetAsync_AShare_ShouldReturnValidData()
     {
-        // 智兔 API 需要令牌
         RequireZhiTuToken();
+        var service = GetService();
 
-        // Arrange - 贵州茅台 SH600519
-        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
-
-        // Act - 真实调用智兔 API 获取资产负债表
         var balanceSheets = await service.GetBalanceSheetAsync("SH600519");
 
-        // Assert - 验证真实资产负债表数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(balanceSheets);
         Assert.IsNotEmpty(balanceSheets, "应返回至少一条资产负债表数据");
 
@@ -107,6 +106,7 @@ public class FinancialDataToolsTest
         Assert.IsTrue(latest.TotalCurrentLiabilities >= 0, $"流动负债合计应非负，实际: {latest.TotalCurrentLiabilities}");
         Assert.IsTrue(latest.MonetaryFunds > 0, $"货币资金应大于0，实际: {latest.MonetaryFunds}");
         Assert.IsTrue(latest.PaidInCapital > 0, $"实收资本应大于0，实际: {latest.PaidInCapital}");
+
         // 会计恒等式校验：资产总计 = 负债合计 + 所有者权益合计
         Assert.IsTrue(latest.TotalAssets.HasValue && latest.TotalLiabilities.HasValue && latest.TotalEquity.HasValue,
             "资产总计、负债合计、所有者权益合计均不应为空，无法校验会计恒等式");
@@ -121,16 +121,11 @@ public class FinancialDataToolsTest
     [TestCategory("Integration")]
     public async Task GetIncomeStatementAsync_AShare_ShouldReturnValidData()
     {
-        // 智兔 API 需要令牌
         RequireZhiTuToken();
+        var service = GetService();
 
-        // Arrange - 贵州茅台 SH600519
-        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
-
-        // Act - 真实调用智兔 API 获取利润表
         var incomeStatements = await service.GetIncomeStatementAsync("SH600519");
 
-        // Assert - 验证真实利润表数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(incomeStatements);
         Assert.IsNotEmpty(incomeStatements, "应返回至少一条利润表数据");
 
@@ -144,10 +139,10 @@ public class FinancialDataToolsTest
         Assert.IsTrue(latest.NetProfit > 0, $"净利润应大于0，实际: {latest.NetProfit}");
         Assert.IsTrue(latest.NetProfitAttributableToParent > 0, $"归母净利润应大于0，实际: {latest.NetProfitAttributableToParent}");
         Assert.IsTrue(latest.BasicEarningsPerShare > 0, $"基本每股收益应大于0，实际: {latest.BasicEarningsPerShare}");
-        // 利润逻辑校验：营业总收入 >= 营业收入
+
+        // 利润逻辑校验：营业总收入 >= 营业收入；利润总额 >= 营业利润
         Assert.IsTrue(latest.TotalOperatingRevenue >= latest.OperatingRevenue,
             $"营业总收入({latest.TotalOperatingRevenue})应大于等于营业收入({latest.OperatingRevenue})");
-        // 利润逻辑校验：利润总额 >= 营业利润（营业外收支净额通常较小，但利润总额应包含营业利润）
         Assert.IsTrue(latest.TotalProfit >= latest.OperatingProfit,
             $"利润总额({latest.TotalProfit})应大于等于营业利润({latest.OperatingProfit})");
 
@@ -158,16 +153,11 @@ public class FinancialDataToolsTest
     [TestCategory("Integration")]
     public async Task GetCashFlowStatementAsync_AShare_ShouldReturnValidData()
     {
-        // 智兔 API 需要令牌
         RequireZhiTuToken();
+        var service = GetService();
 
-        // Arrange - 贵州茅台 SH600519
-        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
-
-        // Act - 真实调用智兔 API 获取现金流量表
         var cashFlowStatements = await service.GetCashFlowStatementAsync("SH600519");
 
-        // Assert - 验证真实现金流量表数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(cashFlowStatements);
         Assert.IsNotEmpty(cashFlowStatements, "应返回至少一条现金流量表数据");
 
@@ -181,6 +171,7 @@ public class FinancialDataToolsTest
         Assert.IsTrue(latest.CashFromSalesAndServices > 0, $"销售商品提供劳务收到的现金应大于0，实际: {latest.CashFromSalesAndServices}");
         Assert.IsTrue(latest.EndingCashBalance > 0, $"期末现金余额应大于0，实际: {latest.EndingCashBalance}");
         Assert.IsTrue(latest.BeginningCashBalance > 0, $"期初现金余额应大于0，实际: {latest.BeginningCashBalance}");
+
         // 现金流逻辑校验：经营活动净额 = 流入小计 - 流出小计
         // 注：智兔 API 季报数据中"经营活动现金流入小计"偶尔小于"销售商品提供劳务收到的现金"，
         // 属于 API 端数据质量问题，此处不校验 total >= sales，仅校验勾稽关系。
@@ -197,16 +188,11 @@ public class FinancialDataToolsTest
     [TestCategory("Integration")]
     public async Task GetFinancialRatiosAsync_AShare_ShouldReturnValidData()
     {
-        // 智兔 API 需要令牌
         RequireZhiTuToken();
+        var service = GetService();
 
-        // Arrange - 贵州茅台 SH600519
-        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
-
-        // Act - 真实调用智兔 API 获取财务主要指标
         var ratios = await service.GetFinancialRatiosAsync("SH600519");
 
-        // Assert - 验证真实财务指标数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(ratios);
         Assert.IsNotEmpty(ratios, "应返回至少一条财务指标数据");
 
@@ -218,9 +204,9 @@ public class FinancialDataToolsTest
         Assert.IsTrue(latest.GrossMargin > 0, $"销售毛利率应大于0，实际: {latest.GrossMargin}");
         Assert.IsTrue(latest.NetProfitMargin > 0, $"净利率应大于0，实际: {latest.NetProfitMargin}");
         Assert.IsTrue(latest.AssetLiabilityRatio >= 0, $"资产负债率应非负，实际: {latest.AssetLiabilityRatio}");
-        // 茅台是高毛利白酒企业，毛利率应处于较高水平（> 50%）
+
+        // 茅台是高毛利白酒企业，毛利率应处于较高水平（> 50%）；资产负债率应较低（< 50%）
         Assert.IsTrue(latest.GrossMargin > 50, $"茅台销售毛利率应大于50%，实际: {latest.GrossMargin}");
-        // 茅台资产负债率应处于较低水平（< 50%）
         Assert.IsTrue(latest.AssetLiabilityRatio < 50, $"茅台资产负债率应小于50%，实际: {latest.AssetLiabilityRatio}");
 
         TestContext?.WriteLine($"SH600519 财务指标 截止日期: {latest.EndDate}, ROE: {latest.ReturnOnEquity}%, 毛利率: {latest.GrossMargin}%, 净利率: {latest.NetProfitMargin}%, 资产负债率: {latest.AssetLiabilityRatio}%");
@@ -230,16 +216,11 @@ public class FinancialDataToolsTest
     [TestCategory("Integration")]
     public async Task GetCapitalStructureAsync_AShare_ShouldReturnValidData()
     {
-        // 智兔 API 需要令牌
         RequireZhiTuToken();
+        var service = GetService();
 
-        // Arrange - 贵州茅台 SH600519
-        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
-
-        // Act - 真实调用智兔 API 获取股本结构
         var capitalStructure = await service.GetCapitalStructureAsync("SH600519");
 
-        // Assert - 验证真实股本结构数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(capitalStructure);
         Assert.IsNotEmpty(capitalStructure, "应返回至少一条股本结构数据");
 
@@ -247,11 +228,14 @@ public class FinancialDataToolsTest
         Assert.IsFalse(string.IsNullOrEmpty(latest.ChangeDate), $"变动日期不应为空，实际: {latest.ChangeDate}");
         Assert.IsTrue(latest.TotalShares > 0, $"总股本应大于0，实际: {latest.TotalShares}");
         Assert.IsTrue(latest.CirculatingAShares > 0, $"已上市流通A股应大于0，实际: {latest.CirculatingAShares}");
+
         // 茅台总股本约 12.56 亿股，校验量级合理性
         Assert.IsTrue(latest.TotalShares > 100000000, $"茅台总股本应大于1亿股，实际: {latest.TotalShares}");
+
         // 已上市流通A股应小于等于总股本
         Assert.IsTrue(latest.CirculatingAShares <= latest.TotalShares,
             $"已上市流通A股({latest.CirculatingAShares})应小于等于总股本({latest.TotalShares})");
+
         // 限售流通股 + 已上市流通A股 = 总股本（若限售流通股字段有值）
         if (latest.RestrictedShares.HasValue)
         {

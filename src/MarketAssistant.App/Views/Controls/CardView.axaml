@@ -2,23 +2,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:MarketAssistant.Views.Controls">
 
-    <!-- CardView 默认样式 -->
+    <!-- ================================================================== -->
+    <!-- CardView — v3：无边框、无默认阴影，靠白色表面与页面底色分层            -->
+    <!--                                                                     -->
+    <!-- 卡片内不再画分隔线。标题与内容之间靠 20px 留白 + 字重差来分区。         -->
+    <!-- ================================================================== -->
     <Style Selector="controls|CardView">
         <Setter Property="Template">
             <ControlTemplate TargetType="controls:CardView">
                 <Border Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        BorderThickness="{StaticResource NoBorderThickness}"
                         CornerRadius="{StaticResource CardCornerRadius}"
                         Padding="{StaticResource CardPadding}">
-                    
-                    <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+                    <Grid RowDefinitions="Auto,Auto,*">
+
                         <!-- 字符串标题 -->
                         <TextBlock x:Name="PART_StringHeaderLabel"
                                    Grid.Row="0"
-                                   FontSize="{StaticResource SectionTitleFontSize}"
-                                   FontWeight="Bold"
+                                   FontSize="{StaticResource BodyFontSize}"
+                                   FontWeight="{DynamicResource WeightTitle}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="{StaticResource BottomMargin}"
                                    IsVisible="False"/>
 
                         <!-- 视图标题 -->
@@ -26,18 +31,11 @@
                                           Grid.Row="1"
                                           HorizontalAlignment="Stretch"
                                           HorizontalContentAlignment="Stretch"
+                                          Margin="{StaticResource BottomMargin}"
                                           IsVisible="False"/>
 
-                        <!-- 分隔线 -->
-                        <Border x:Name="PART_Divider"
-                                Grid.Row="2"
-                                Height="{StaticResource DividerHeight}"
-                                Margin="{StaticResource DefaultMargin}"
-                                Background="{DynamicResource DividerBrush}"
-                                IsVisible="False"/>
-
-                        <!-- 主要内容 -->
-                        <ContentPresenter Grid.Row="3"
+                        <!-- 主要内容。v3 移除了分隔线：改由标题的底部外边距建立间距。 -->
+                        <ContentPresenter Grid.Row="2"
                                           Content="{TemplateBinding Content}"
                                           ContentTemplate="{TemplateBinding ContentTemplate}"
                                           HorizontalAlignment="Stretch"

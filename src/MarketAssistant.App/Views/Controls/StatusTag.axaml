@@ -1,0 +1,82 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MarketAssistant.Views.Controls">
+
+    <!-- ================================================================== -->
+    <!-- StatusTag — 状态标签                                                 -->
+    <!--                                                                     -->
+    <!-- 12% 语义底 + 配对文字色，不描边。字号 Caption、字重 WeightEmphasis，    -->
+    <!-- 内边距 TagPadding、圆角 TinyCornerRadius。                            -->
+    <!--                                                                     -->
+    <!-- 颜色必须写在样式里而不是模板里：模板内的属性值是本地值，样式覆盖不了。    -->
+    <!-- 同时带多个语义类时，下面声明靠后的生效：                               -->
+    <!--   中性（默认）< info < success < warning < danger < bullish < bearish -->
+    <!-- ================================================================== -->
+    <Style Selector="controls|StatusTag">
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:StatusTag">
+                <Border x:Name="PART_Surface"
+                        CornerRadius="{StaticResource TinyCornerRadius}"
+                        Padding="{StaticResource TagPadding}">
+                    <TextBlock x:Name="PART_Text"
+                               Text="{TemplateBinding Text}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               FontWeight="{DynamicResource WeightEmphasis}"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- 中性（默认） -->
+    <Style Selector="controls|StatusTag /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource NeutralTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusTag.info /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource InfoTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag.info /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource InfoPanelTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusTag.success /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource SuccessTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag.success /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource SuccessPanelTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusTag.warning /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource WarningTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag.warning /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource WarningPanelTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusTag.danger /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource DangerTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag.danger /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource DangerPanelTextBrush}"/>
+    </Style>
+
+    <!-- 涨跌方向：买入 / 多头 = 红（涨），卖出 / 空头 = 绿（跌），与全局 A 股配色一致 -->
+    <Style Selector="controls|StatusTag.bullish /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource BullishTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag.bullish /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource BullishTagTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusTag.bearish /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource BearishTagBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusTag.bearish /template/ TextBlock#PART_Text">
+        <Setter Property="Foreground" Value="{DynamicResource BearishTagTextBrush}"/>
+    </Style>
+</Styles>

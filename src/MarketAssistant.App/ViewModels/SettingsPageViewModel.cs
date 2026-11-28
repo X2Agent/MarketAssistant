@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.AlertCenter.Channels;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Dialog;
@@ -13,7 +12,6 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
@@ -76,7 +74,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(IsFuturesTradingMode));
                 break;
             case nameof(UserSetting.WebSearchProvider):
-                OnPropertyChanged(nameof(IsBingProvider));
                 OnPropertyChanged(nameof(IsBraveProvider));
                 OnPropertyChanged(nameof(IsTavilyProvider));
                 break;
@@ -86,7 +83,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public List<string> WebSearchProviders { get; } = ["Bing", "Brave", "Tavily"];
+    public List<string> WebSearchProviders { get; } = ["Brave", "Tavily"];
 
     public List<RiskToleranceLevel> RiskToleranceOptions { get; } = [.. Enum.GetValues<RiskToleranceLevel>()];
 
@@ -190,16 +187,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == TradingMode.FuturesTestnet;
 
     public bool IsFuturesTradingMode => IsLiveFuturesTradingMode || IsFuturesTestnetTradingMode;
-
-    public bool IsBingProvider
-    {
-        get => UserSetting.WebSearchProvider == "Bing";
-        set
-        {
-            if (value)
-                UserSetting.WebSearchProvider = "Bing";
-        }
-    }
 
     public bool IsBraveProvider
     {
@@ -328,7 +315,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                     "切换到实盘模式",
                     "市场监控正在运行。保存后会先停止监控并切换到实盘模式，后续触发的交易将发送到真实账户。\n\n请确认是否继续？",
                     "确认切换",
-                    "取消");
+                    "取消",
+                    destructive: true);
 
                 if (!confirmed)
                 {

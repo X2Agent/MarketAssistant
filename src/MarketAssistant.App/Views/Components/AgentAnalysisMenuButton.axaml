@@ -1,0 +1,150 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:models="using:MarketAssistant.Services.Archive"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             mc:Ignorable="d"
+             x:Class="MarketAssistant.Views.Components.AgentAnalysisMenuButton"
+             x:DataType="vm:AgentAnalysisViewModel">
+
+    <UserControl.Resources>
+        <x:Double x:Key="MenuFlyoutWidth">260</x:Double>
+        <x:Double x:Key="HistoryListMaxHeight">240</x:Double>
+    </UserControl.Resources>
+
+    <!-- 「更多操作」：挂在主窗口返回条右侧，与「← 标题」同一行，页面内不再单占一行。
+         分析中没有可操作的报告，直接隐藏；智能助手抽屉打开时与遮罩下的页面一样不可操作。 -->
+    <Button Classes="btn-ghost btn-icon"
+            FontSize="{StaticResource TitleFontSize}"
+            Content="⋮"
+            IsVisible="{Binding !IsBusy}"
+            IsEnabled="{Binding !IsChatSidebarVisible}"
+            ToolTip.Tip="更多操作"
+            AutomationProperties.Name="更多操作">
+        <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+                <Border Width="{StaticResource MenuFlyoutWidth}">
+                    <StackPanel>
+                        <StackPanel.Styles>
+                            <Style Selector="Button">
+                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+                                <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+                                <Setter Property="Margin" Value="{StaticResource TinyBottomMargin}"/>
+                                <Setter Property="Transitions">
+                                    <Transitions>
+                                        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                                    </Transitions>
+                                </Setter>
+                            </Style>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+                            </Style>
+                            <Style Selector="Button:disabled">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Style>
+                            <!-- 历史报告的标题行（日期）：数据字体 + 主色 + 标题字重。
+                                 必须用类样式：DataTemplate 里元素上本地写的 DynamicResource 优先级低于 caption 类，写在元素上不生效 -->
+                            <Style Selector="TextBlock.history-title">
+                                <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
+                                <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Style>
+                        </StackPanel.Styles>
+
+                        <!-- 重新分析：报告已经展示时也需要重跑入口，
+                             否则唯一的入口只剩空态/失败浮层里的按钮 -->
+                        <Button Command="{Binding RetryAnalysisCommand}"
+                                IsEnabled="{Binding !IsBusy}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_refresh.svg"
+                                         Width="{StaticResource BodySmFontSize}"
+                                         Height="{StaticResource BodySmFontSize}"
+                                         VerticalAlignment="Center"/>
+                                <TextBlock Text="重新分析" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 导出报告 -->
+                        <Button Command="{Binding ExportReportCommand}"
+                                IsEnabled="{Binding CanExportReport}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_document.svg"
+                                         Width="{StaticResource BodySmFontSize}"
+                                         Height="{StaticResource BodySmFontSize}"
+                                         VerticalAlignment="Center"/>
+                                <TextBlock Text="导出 Markdown 报告" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 导出分享图 / PDF -->
+                        <Button Command="{Binding ExportShareImageCommand}"
+                                IsEnabled="{Binding CanExportReport}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_chart.svg"
+                                         Width="{StaticResource BodySmFontSize}"
+                                         Height="{StaticResource BodySmFontSize}"
+                                         VerticalAlignment="Center"/>
+                                <TextBlock Text="导出分享图（PNG）" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ExportPdfCommand}"
+                                IsEnabled="{Binding CanExportReport}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_document.svg"
+                                         Width="{StaticResource BodySmFontSize}"
+                                         Height="{StaticResource BodySmFontSize}"
+                                         VerticalAlignment="Center"/>
+                                <TextBlock Text="导出 PDF" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 历史报告标题：用色阶与上方的操作区分组，不画分隔线 -->
+                        <TextBlock Text="历史报告"
+                                   Classes="caption"
+                                   FontWeight="{DynamicResource WeightTitle}"
+                                   Margin="{StaticResource SmallTopMargin}"
+                                   IsVisible="{Binding HasReportHistory}"/>
+
+                        <!-- 历史报告列表（可滚动） -->
+                        <ScrollViewer MaxHeight="{StaticResource HistoryListMaxHeight}"
+                                      IsVisible="{Binding HasReportHistory}"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding ReportHistory}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ReportSummary">
+                                        <!-- 全局 Button 固定 36 高：日期 / 总分 / 分项三行会被裁成只剩日期，这里按内容撑高 -->
+                                        <Button Height="NaN"
+                                                Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="{StaticResource CompactSpacing}">
+                                                <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}"
+                                                           Classes="caption history-title"/>
+                                                <TextBlock Text="{Binding ScoreTrendText}"
+                                                           Classes="caption"/>
+                                                <TextBlock Text="{Binding KeyScoreChangeText}"
+                                                           Classes="caption"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- 无历史报告占位 -->
+                        <TextBlock Text="暂无历史报告"
+                                   Classes="caption"
+                                   HorizontalAlignment="Center"
+                                   Margin="{StaticResource DefaultVerticalMargin}"
+                                   IsVisible="{Binding !HasReportHistory}"/>
+                    </StackPanel>
+                </Border>
+            </Flyout>
+        </Button.Flyout>
+    </Button>
+</UserControl>

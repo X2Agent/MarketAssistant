@@ -1,11 +1,12 @@
 ﻿using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Analysis;
+using MarketAssistant.Applications.Assets;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Export;
@@ -31,8 +32,20 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     private readonly AnalysisOrchestrationService _orchestrationService;
 
+    /// <summary>导出长图时把各分析师的结论解析成与聊天侧栏同一套卡片。</summary>
+    private readonly AdaptiveCardConverter _adaptiveCardConverter;
+
     [ObservableProperty]
     private string _stockCode = "";
+
+    /// <summary>
+    /// 当前标的名称（导航参数带入）。报告只归档代码，名称在此持有并回填到报告头部；
+    /// 为空时由 <see cref="ResolveAssetNameAsync"/> 回退到资产信息服务查询。
+    /// </summary>
+    private string _assetName = string.Empty;
+
+    /// <summary>进度卡副标题：「名称 · 代码」；导航参数没带名称（如告警历史跳转）时只显示代码。</summary>
+    public string AnalysisSubjectText => string.IsNullOrEmpty(_assetName) ? StockCode : $"{_assetName} · {StockCode}";
 
     [ObservableProperty]
     private bool _isAnalysisInProgress;
@@ -211,11 +224,13 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisOrchestrationService orchestrationService,
         AnalysisReportViewModel analysisReportViewModel,
         ChatSidebarViewModel chatSidebarViewModel,
+        AdaptiveCardConverter adaptiveCardConverter,
         MarketContext marketContext,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _orchestrationService = orchestrationService;
         _analysisReportViewModel = analysisReportViewModel;
+        _adaptiveCardConverter = adaptiveCardConverter;
 
         _progressSmoothTimer = new DispatcherTimer(SmoothTickInterval, DispatcherPriority.Background, OnProgressSmoothTimerTick);
         _progressSmoothTimer.Stop();
@@ -332,7 +347,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
                     AnalystRunStatus.Running => EstimateRunningCredit(a.Elapsed.TotalSeconds),
                     _ => 0.0
                 }) / e.Analysts.Count * 80.0, 0, 80),
-            AnalysisPhase.Aggregating => 89,
             AnalysisPhase.Reporting => 95,
             AnalysisPhase.Completed => 100,
             _ => _targetPercent
@@ -387,7 +401,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// <summary>
     /// 分析执行中：按运行中分析师的实时耗时持续重算目标百分比，
     /// 使两位分析师进度事件之间的空闲期百分比仍平滑推进，而非长时间停滞。
-    /// 仅在存在运行中条目时生效，避免覆盖阶段事件给出的目标值（聚合 89% / 报告 95%）
+    /// 仅在存在运行中条目时生效，避免覆盖阶段事件给出的目标值（报告 95%）
     /// </summary>
     private void RecomputeTargetPercentFromItems()
     {
@@ -426,6 +440,30 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         UsageSummaryText = TokenUsageFormatter.FormatSummary(usage);
         UsageDetailText = TokenUsageFormatter.FormatDetail(usage);
         UsageIsEstimated = usage?.IsEstimated == true;
+    }
+
+    /// <summary>
+    /// 解析标的名称：导航参数已带名称时直接复用，否则回退到当前市场的资产信息服务查询。
+    /// 名称只是报告头部的展示信息，取不到时留空（不阻断报告展示，与最近查看的行情补全同口径）。
+    /// </summary>
+    private async Task<string> ResolveAssetNameAsync(string assetCode)
+    {
+        if (!string.IsNullOrWhiteSpace(_assetName))
+            return _assetName;
+
+        if (MarketContext == null)
+            return string.Empty;
+
+        try
+        {
+            var info = await MarketContext.GetService<IAssetInfoService>().GetAssetInfoAsync(assetCode);
+            return info.Name;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger?.LogWarning(ex, "补全标的名称失败: {AssetCode}", assetCode);
+            return string.Empty;
+        }
     }
 
     private void ResetProgressDisplay()
@@ -496,12 +534,15 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             if (_disposed || runId != _activeAnalysisRunId)
                 return;
 
+            var assetName = await ResolveAssetNameAsync(report.AssetSymbol);
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 if (_disposed || runId != _activeAnalysisRunId)
                     return;
 
                 AnalysisReportViewModel.UpdateWithReport(report);
+                AnalysisReportViewModel.AssetName = assetName;
                 if (ChatSidebarViewModel != null)
                 {
                     await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, report.AnalystMessages);
@@ -540,11 +581,10 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         if (_lastReport == null || _storageProvider == null)
             return;
 
-        var suggestedName = $"{_lastReport.AssetSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出分析报告",
-            SuggestedFileName = suggestedName,
+            SuggestedFileName = BuildReportFileName(),
             FileTypeChoices =
             [
                 new FilePickerFileType("Markdown") { Patterns = ["*.md"] },
@@ -563,7 +603,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     }
 
     /// <summary>
-    /// 导出分享卡图片（PNG）。分享卡为固定画布离屏渲染，与 PDF 视觉一致。
+    /// 导出报告长图（PNG）：页面同一份完整报告加关键指标、各分析师详情附录，离屏渲染，与 PDF 视觉一致。
     /// </summary>
     [RelayCommand]
     private async Task ExportShareImageAsync()
@@ -574,7 +614,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出分享图",
-            SuggestedFileName = BuildShareCardFileName(),
+            SuggestedFileName = BuildReportFileName(),
             FileTypeChoices =
             [
                 new FilePickerFileType("PNG 图片") { Patterns = ["*.png"] },
@@ -584,15 +624,16 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
         if (file == null) return;
 
+        // 先渲染再打开目标文件：渲染失败时不会留下 0 字节文件
+        var bytes = ReportImageRenderer.RenderToPngBytes(_lastReport, AnalysisReportViewModel.AssetName, _adaptiveCardConverter);
         await using var stream = await file.OpenWriteAsync();
-        var bytes = ReportShareCardRenderer.RenderToPngBytes(BuildShareCardData(_lastReport));
         await stream.WriteAsync(bytes);
 
         Logger?.LogInformation("分享图已导出: {Path}", file.Name);
     }
 
     /// <summary>
-    /// 导出分享卡 PDF（单页，内容与分享图一致）。
+    /// 导出报告 PDF（A4 分页，内容与分享图一致）。
     /// </summary>
     [RelayCommand]
     private async Task ExportPdfAsync()
@@ -603,7 +644,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出 PDF",
-            SuggestedFileName = BuildShareCardFileName(),
+            SuggestedFileName = BuildReportFileName(),
             FileTypeChoices =
             [
                 new FilePickerFileType("PDF 文档") { Patterns = ["*.pdf"] },
@@ -620,40 +661,24 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }
 
         var localPath = file.TryGetLocalPath() ?? file.Name;
-        ReportShareCardRenderer.SavePdf(BuildShareCardData(_lastReport), localPath);
+        ReportImageRenderer.SavePdf(_lastReport, AnalysisReportViewModel.AssetName, _adaptiveCardConverter, localPath);
 
         Logger?.LogInformation("PDF 已导出: {Path}", localPath);
     }
 
-    private string BuildShareCardFileName()
-        => $"{_lastReport!.AssetSymbol}_分析卡片_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
-
-    /// <summary>
-    /// 从报告构建分享卡数据：亮点取前 3 条，Token 摘要直接复用展示层格式化。
-    /// </summary>
-    private static ReportShareCardData BuildShareCardData(MarketAnalysisReport report)
-    {
-        var coordinator = report.CoordinatorResult;
-        return new ReportShareCardData
-        {
-            AssetName = report.AssetSymbol,
-            AssetSymbol = report.AssetSymbol,
-            OverallScore = coordinator.OverallScore,
-            InvestmentRating = coordinator.InvestmentRating.GetDescription(),
-            TargetPrice = coordinator.TargetPrice,
-            PriceChangeExpectation = coordinator.PriceChangeExpectation,
-            ConfidencePercentage = coordinator.ConfidencePercentage,
-            Highlights = [.. coordinator.InvestmentHighlights.Take(3)],
-            UsageSummary = TokenUsageFormatter.FormatSummary(report.Usage),
-            GeneratedAt = report.CreatedAt
-        };
-    }
+    /// <summary>三种导出共用的建议文件名（不含扩展名）。</summary>
+    private string BuildReportFileName()
+        => $"{_lastReport!.AssetSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
 
     public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
     {
         if (!string.IsNullOrEmpty(parameter.Code))
         {
             StockCode = parameter.Code;
+            // 报告只归档代码，名称从导航参数带入；告警历史跳转时参数名称为空，
+            // 届时由 ResolveAssetNameAsync 在出报告后回查补全
+            _assetName = parameter.Name;
+            OnPropertyChanged(nameof(AnalysisSubjectText));
             Logger?.LogInformation("导航到 AI 分析页面，资产代码: {Code}，重新激活: {IsReactivation}", StockCode, isReactivation);
             // GoBack 重新激活时不重复启动分析，避免重复请求
             if (!isReactivation)
@@ -702,9 +727,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             AnalysisFailureMessage = string.Empty;
             ApplyTokenUsage(report.Usage);
 
+            var assetName = await ResolveAssetNameAsync(report.AssetSymbol);
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 AnalysisReportViewModel.UpdateWithReport(report);
+                AnalysisReportViewModel.AssetName = assetName;
                 if (ChatSidebarViewModel != null)
                     await ChatSidebarViewModel.InitializeWithAnalysisHistory(report.AssetSymbol, report.AnalystMessages);
             });
@@ -725,6 +753,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _analysisCts = null;
         _activeAnalysisRunId = null;
         _lastReport = null;
+        _assetName = string.Empty;
 
         // 重置分析状态
         IsAnalysisInProgress = false;
@@ -735,6 +764,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisFailureMessage = string.Empty;
 
         OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(AnalysisSubjectText));
     }
 
     public void Dispose()
@@ -776,10 +806,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
     [ObservableProperty]
     private string _elapsedText = "--:--";
 
-    /// <summary>状态徽标文本（完成 ✓ / 失败 ✗ / 其他为空）</summary>
-    [ObservableProperty]
-    private string _statusMark = string.Empty;
-
     /// <summary>该分析师的 Token 用量文本（紧凑计数），未统计时为空</summary>
     [ObservableProperty]
     private string _tokensText = string.Empty;
@@ -796,9 +822,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
 
     /// <summary>等待执行的灰色静默点</summary>
     public bool IsPending => Status == AnalystRunStatus.Pending;
-
-    /// <summary>终态（完成/失败）则不再需要呼吸动画</summary>
-    public bool IsLive => IsRunning;
 
     public static AnalystRunItemViewModel From(AnalystRunSnapshot snapshot)
     {
@@ -840,12 +863,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
             // 避免 Stopwatch.GetElapsedTime(0) 把进程运行时长误算为耗时
             _runningStartedTimestamp = Stopwatch.GetTimestamp();
         }
-        StatusMark = snapshot.Status switch
-        {
-            AnalystRunStatus.Completed => "✓",
-            AnalystRunStatus.Failed => "✗",
-            _ => string.Empty
-        };
         if (snapshot.Status == AnalystRunStatus.Running)
         {
             ElapsedText = FormatElapsed(Stopwatch.GetElapsedTime(_runningStartedTimestamp));
@@ -862,7 +879,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
         OnPropertyChanged(nameof(IsFailed));
         OnPropertyChanged(nameof(IsRunning));
         OnPropertyChanged(nameof(IsPending));
-        OnPropertyChanged(nameof(IsLive));
 
         HasTokenUsage = snapshot.HasTokenUsage;
         TokensText = snapshot.HasTokenUsage

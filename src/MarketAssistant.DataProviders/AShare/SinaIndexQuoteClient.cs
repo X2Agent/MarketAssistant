@@ -24,7 +24,7 @@ public sealed class SinaIndexQuoteClient(IHttpClientFactory httpClientFactory)
 
     private const string QueryPath = "/list=" + IndexList;
 
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 拉取三大指数行情。整体失败或无数据时返回空列表（由上层顶栏降级隐藏）。

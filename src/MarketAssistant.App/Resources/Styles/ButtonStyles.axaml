@@ -2,265 +2,274 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ================================================================== -->
-    <!-- 按钮组件体系 (Button System)                                        -->
-    <!-- 变体: Primary / Secondary / Ghost / Danger / Icon                   -->
-    <!-- 尺寸: Small (28) / Medium (32) / Large (40)                          -->
+    <!-- MarketAssistant Design System v3.0 — Buttons                          -->
+    <!--                                                                     -->
+    <!-- 变体：btn-primary / btn-secondary / btn-ghost / btn-danger / btn-icon -->
+    <!-- 尺寸：btn-sm(30) / 默认(36)；更大的按钮用默认尺寸 + 更大 Padding，不另设变体 -->
+    <!--                                                                     -->
+    <!-- 交互铁律：                                                            -->
+    <!--  - hover 只加深色阶与阴影，绝不放大、绝不位移。                        -->
+    <!--  - 全库只有一个强调色按钮（btn-primary）。一个视图内原则上只出现一个。   -->
+    <!--  - 无边框。次要按钮用色阶底（SurfaceVariantBrush），不用描边。          -->
     <!-- ================================================================== -->
 
-    <!-- ===== 全局按钮默认 ===== -->
+    <!-- ===== 全局默认 ===== -->
     <Style Selector="Button">
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
         <Setter Property="Padding" Value="16,0"/>
         <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <!-- 关闭 Fluent 默认的黑色方框焦点装饰：键盘焦点统一走下方的 FocusRing -->
+        <Setter Property="FocusAdorner" Value="{x:Null}"/>
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.15"/>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
                 <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
 
-    <!-- ===== Primary 按钮 — 主要操作 ===== -->
+    <!-- ===== Primary：唯一强调按钮 ===== -->
     <Style Selector="Button.btn-primary">
-        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+        <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
     </Style>
     <Style Selector="Button.btn-primary:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+        <Setter Property="Background" Value="{StaticResource AccentPressedBrush}"/>
     </Style>
     <Style Selector="Button.btn-primary:disabled">
-        <Setter Property="Opacity" Value="0.5"/>
+        <Setter Property="Opacity" Value="0.4"/>
     </Style>
 
-    <!-- ===== Secondary 按钮 — 次要操作 ===== -->
+    <!-- 键盘焦点环：所有按钮变体共用，仅 Tab / 方向键导航时出现，鼠标点击不会触发。
+         Avalonia 的 Button 默认 ClipToBounds=True，焦点环画在边界之外会被裁成四个角，
+         所以获得键盘焦点时临时关闭裁剪。危险确认框把默认焦点放在“取消”上，
+         靠这道环让用户看见回车会落在哪个按钮。 -->
+    <Style Selector="Button:focus-visible">
+        <Setter Property="ClipToBounds" Value="False"/>
+    </Style>
+    <Style Selector="Button:focus-visible /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+    </Style>
+
+    <!-- ===== Secondary：次要操作，色阶底，无描边 ===== -->
     <Style Selector="Button.btn-secondary">
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
     </Style>
     <Style Selector="Button.btn-secondary:pointerover">
-        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource TextSecondaryBrush}"/>
-    </Style>
-    <Style Selector="Button.btn-secondary:pressed">
         <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
     </Style>
+    <Style Selector="Button.btn-secondary:pressed">
+        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-secondary:disabled">
+        <Setter Property="Opacity" Value="0.4"/>
+    </Style>
 
-    <!-- ===== Ghost 按钮 — 低优先级操作 ===== -->
+    <!-- ===== Ghost：最低优先级，hover 才出现底色 ===== -->
     <Style Selector="Button.btn-ghost">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Button.btn-ghost:pointerover">
         <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
+    <Style Selector="Button.btn-ghost:pressed">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-ghost:disabled">
+        <Setter Property="Opacity" Value="0.4"/>
+    </Style>
 
-    <!-- ===== Danger 按钮 — 危险/删除操作 ===== -->
+    <!-- ===== Danger：破坏性操作，浅语义底 + 语义字，不是实心红（避免抢走强调色焦点） ===== -->
     <Style Selector="Button.btn-danger">
         <Setter Property="Background" Value="{DynamicResource DangerPanelBackgroundBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource DangerPanelTextBrush}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
-    <Style Selector="Button.btn-danger:pointerover /template/ ContentPresenter">
+    <Style Selector="Button.btn-danger:pointerover">
         <Setter Property="Background" Value="{DynamicResource DangerPanelBackgroundStrongBrush}"/>
     </Style>
-    <Style Selector="Button.btn-danger:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource DangerPanelBorderBrush}"/>
+    <Style Selector="Button.btn-danger:pressed">
+        <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
     </Style>
+    <Style Selector="Button.btn-danger:disabled">
+        <Setter Property="Opacity" Value="0.4"/>
+    </Style>
 
-    <!-- ===== 按钮尺寸变体 ===== -->
-
-    <!-- Small 按钮 (28px) -->
+    <!-- ===== 尺寸 ===== -->
     <Style Selector="Button.btn-sm">
         <Setter Property="Height" Value="{StaticResource SmallButtonHeight}"/>
-        <Setter Property="FontSize" Value="{StaticResource TinyFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
         <Setter Property="Padding" Value="12,0"/>
     </Style>
 
-    <!-- Large 按钮 (40px) -->
-    <Style Selector="Button.btn-lg">
-        <Setter Property="Height" Value="{StaticResource LargeButtonHeight}"/>
-        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
-        <Setter Property="Padding" Value="24,0"/>
-    </Style>
-
-    <!-- ===== Icon 按钮 — 纯图标按钮 (44px 点击区域) ===== -->
+    <!-- ===== Icon 按钮（40px 点击区，图标 18–20） ===== -->
     <Style Selector="Button.btn-icon">
         <Setter Property="Width" Value="{StaticResource IconButtonSize}"/>
         <Setter Property="Height" Value="{StaticResource IconButtonSize}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
     </Style>
     <Style Selector="Button.btn-icon:pointerover">
         <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
+    <Style Selector="Button.btn-icon:pressed">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
     <Style Selector="Button.btn-icon:disabled">
         <Setter Property="Opacity" Value="0.35"/>
     </Style>
 
-    <!-- Small Icon 按钮 (36px) -->
     <Style Selector="Button.btn-icon-sm">
         <Setter Property="Width" Value="{StaticResource SmallIconButtonSize}"/>
         <Setter Property="Height" Value="{StaticResource SmallIconButtonSize}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
     </Style>
     <Style Selector="Button.btn-icon-sm:pointerover">
         <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
 
-    <!-- ===== 特定场景按钮（保持向后兼容） ===== -->
+    <!-- ================================================================== -->
+    <!-- 场景按钮：按业务语义命名的变体（非兼容层，均在页面中实际使用）        -->
+    <!-- ================================================================== -->
 
-    <!-- 时间周期按钮 -->
+    <!-- 下划线页签：底部 2px 主色指示条，独立图层不挤压文字。
+         交易页与告警页共用这一份实现——此前两页各写了一套 ControlTemplate，
+         内边距（14,9 / 0,6,24,8）与字重都不一致。 -->
+    <Style Selector="Button.underline-tab">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border x:Name="PART_Indicator"
+                            Height="2"
+                            VerticalAlignment="Bottom"
+                            Margin="{StaticResource SmallHorizontalMargin}"
+                            CornerRadius="1,1,0,0"
+                            Background="Transparent"/>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Button.underline-tab /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="TextBlock.FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="TextBlock.FontWeight" Value="{DynamicResource WeightBody}"/>
+    </Style>
+    <Style Selector="Button.underline-tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style Selector="Button.underline-tab.selected /template/ Border#PART_Indicator">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+    </Style>
+    <Style Selector="Button.underline-tab.selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="TextBlock.Foreground" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="TextBlock.FontWeight" Value="{DynamicResource WeightTitle}"/>
+    </Style>
+
+    <!-- 分段器按钮：选中态用强调色实底 -->
     <Style Selector="Button.period-button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="Padding" Value="{StaticResource SmallHorizontalMargin}"/>
+        <Setter Property="Padding" Value="12,0"/>
         <Setter Property="Height" Value="{StaticResource SmallButtonHeight}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
     </Style>
     <Style Selector="Button.period-button:pointerover">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="Button.period-button.selected">
-        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
     </Style>
 
-    <!-- 操作按钮 -->
+    <!-- 轻量操作按钮：色阶底 -->
     <Style Selector="Button.action-button">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="Padding" Value="{StaticResource HorizontalMargin}"/>
+        <Setter Property="Padding" Value="16,0"/>
         <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
     </Style>
     <Style Selector="Button.action-button:pointerover">
-        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
+    <Style Selector="Button.action-button:disabled">
+        <Setter Property="Opacity" Value="0.45"/>
     </Style>
 
-    <!-- 成功按钮 -->
-    <Style Selector="Button.success">
-        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-    </Style>
-    <Style Selector="Button.success:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource SuccessHoverBrush}"/>
-    </Style>
-    <Style Selector="Button.success:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource SuccessPressedBrush}"/>
-    </Style>
+    <!-- 语义实底按钮（success / warning）已下线：全库只有 btn-primary 一个强调色按钮，
+         成功 / 警告语义靠 StatusBanner 与语义图标表达，不再做绿色、橙色的实底按钮。 -->
 
-    <!-- 警告按钮 -->
-    <Style Selector="Button.warning">
-        <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-    </Style>
-    <Style Selector="Button.warning:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource WarningHoverBrush}"/>
-    </Style>
-    <Style Selector="Button.warning:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource WarningPressedBrush}"/>
-    </Style>
-
-    <!-- 功能按钮 — 次要描边样式，与浅色卡片风格统一 -->
-    <Style Selector="Button.feature-button">
-        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
-        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
-        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
-    </Style>
-    <Style Selector="Button.feature-button:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
-    </Style>
-    <Style Selector="Button.feature-button:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
-    </Style>
-
-    <!-- 图标操作按钮 — 工具栏图标按钮，悬停浅色反馈 -->
-    <Style Selector="Button.icon-action">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="Padding" Value="8"/>
-        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-    <Style Selector="Button.icon-action:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
-    </Style>
-    <Style Selector="Button.icon-action:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
-    </Style>
-
-    <!-- Info 按钮 — 信息/链接操作 -->
+    <!-- 信息按钮：中性色阶，不用强调色。
+         v3 规定一个视图只允许一个 btn-primary；若此处也用强调色，
+         页面会出现两个同级主按钮，焦点就散了。 -->
     <Style Selector="Button.btn-info">
-        <Setter Property="Background" Value="{StaticResource InfoBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
     </Style>
-    <Style Selector="Button.btn-info:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource InfoHoverBrush}"/>
+    <Style Selector="Button.btn-info:pointerover">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
     </Style>
-    <Style Selector="Button.btn-info:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource InfoPressedBrush}"/>
-    </Style>
-
-    <!-- 悬停显示按钮 (删除/收藏) -->
-    <Style Selector="Button.delete-button, Button.favorite-button">
-        <Setter Property="Opacity" Value="0"/>
-        <Setter Property="IsHitTestVisible" Value="False"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
-            </Transitions>
-        </Setter>
+    <Style Selector="Button.btn-info:pressed">
+        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
     </Style>
 
-    <!-- 收藏按钮 -->
-    <Style Selector="Button.favorite-button">
-        <Setter Property="Background" Value="Transparent"/>
+    <!-- 功能按钮：强调色浅底 + 强调色字（次级强调，不与 btn-primary 同级） -->
+    <Style Selector="Button.feature-button">
+        <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+        <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
+        <!-- 上下必须为 0：按钮高度固定 36，四边 16 的卡片内边距会吃掉 32px，
+             只剩 4px 放文字，字会被压成一条细线。 -->
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
-
+    <Style Selector="Button.feature-button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
+    </Style>
+    <Style Selector="Button.feature-button:pressed">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
 </Styles>

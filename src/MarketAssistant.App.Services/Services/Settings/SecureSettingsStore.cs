@@ -33,9 +33,6 @@ internal sealed class SecureSettingsStore : ISecureSettingsStore
 
     public SecureSettingsStore(string fileName, string directory)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
-
         var builder = new StorageCreationPropertiesBuilder(fileName, directory)
             .WithMacKeyChain(MacKeyChainServiceName, $"{MacKeyChainAccountName}:{fileName}")
             .WithLinuxKeyring(
@@ -69,8 +66,6 @@ internal sealed class SecureSettingsStore : ISecureSettingsStore
 
     public void Write<T>(T value)
     {
-        ArgumentNullException.ThrowIfNull(value);
-
         lock (_lock)
         {
             try

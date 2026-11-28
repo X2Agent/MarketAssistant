@@ -21,11 +21,19 @@ public sealed class BalanceDisplayItem
     public decimal PortfolioPercent { get; init; }
 }
 
-public partial class BalanceDetailPageViewModel(
-    CryptoPortfolioService portfolioService,
-    ILogger<BalanceDetailPageViewModel> logger) : ViewModelBase(logger), INavigationAware
+public partial class BalanceDetailPageViewModel : ViewModelBase, INavigationAware
 {
-    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly CryptoPortfolioService _portfolioService;
+
+    public BalanceDetailPageViewModel(
+        CryptoPortfolioService portfolioService,
+        ILogger<BalanceDetailPageViewModel> logger)
+        : base(logger)
+    {
+        _portfolioService = portfolioService;
+        EmptyMessage = "暂无余额数据";
+        SetRetryCommand(() => RefreshAsync());
+    }
 
     public ObservableCollection<BalanceDisplayItem> Balances { get; } = [];
 
@@ -51,9 +59,9 @@ public partial class BalanceDetailPageViewModel(
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async ct =>
         {
-            var summary = await _portfolioService.GetAccountBalanceSummaryAsync();
+            var summary = await _portfolioService.GetAccountBalanceSummaryAsync(ct);
 
             TotalValueUSDT = summary.TotalValueUSDT;
             AvailableUSDT = CryptoPortfolioService.GetUsdtBalance(summary);
@@ -79,7 +87,8 @@ public partial class BalanceDetailPageViewModel(
             PositionValueUSDT = TotalValueUSDT - AvailableUSDT;
             PositionPercent = TotalValueUSDT > 0 ? PositionValueUSDT / TotalValueUSDT * 100 : 0;
             HasData = Balances.Count > 0;
-        }, "刷新账户余额");
+            return HasData;
+        }, "加载账户余额");
     }
 
     /// <summary>

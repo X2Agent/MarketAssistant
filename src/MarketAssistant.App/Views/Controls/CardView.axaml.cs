@@ -6,7 +6,8 @@ using Avalonia.Controls.Primitives;
 namespace MarketAssistant.Views.Controls;
 
 /// <summary>
-/// 卡片视图控件，支持标题和阴影效果
+/// 卡片视图控件，支持标题区（字符串或任意视图）。
+/// v3 起卡片不再绘制分隔线，标题与内容之间由标题的底部外边距建立间距。
 /// </summary>
 public partial class CardView : ContentControl
 {
@@ -24,7 +25,6 @@ public partial class CardView : ContentControl
 
     private TextBlock? _stringHeaderLabel;
     private ContentPresenter? _viewHeaderPresenter;
-    private Border? _divider;
 
     static CardView()
     {
@@ -41,7 +41,6 @@ public partial class CardView : ContentControl
         // 获取模板元素 (使用 PART_ 命名约定)
         _stringHeaderLabel = e.NameScope.Find<TextBlock>("PART_StringHeaderLabel");
         _viewHeaderPresenter = e.NameScope.Find<ContentPresenter>("PART_ViewHeaderContentPresenter");
-        _divider = e.NameScope.Find<Border>("PART_Divider");
 
         // 初始化状态
         if (_stringHeaderLabel != null) _stringHeaderLabel.IsVisible = false;
@@ -50,19 +49,17 @@ public partial class CardView : ContentControl
             _viewHeaderPresenter.IsVisible = false;
             _viewHeaderPresenter.Content = null;
         }
-        if (_divider != null) _divider.IsVisible = false;
 
         // 应用当前Header值
         UpdateHeader();
     }
-
 
     /// <summary>
     /// 更新标题显示
     /// </summary>
     private void UpdateHeader()
     {
-        if (_stringHeaderLabel == null || _viewHeaderPresenter == null || _divider == null)
+        if (_stringHeaderLabel == null || _viewHeaderPresenter == null)
         {
             return;
         }
@@ -76,7 +73,6 @@ public partial class CardView : ContentControl
             _stringHeaderLabel.IsVisible = true;
             _viewHeaderPresenter.IsVisible = false;
             _viewHeaderPresenter.Content = null;
-            _divider.IsVisible = true;
         }
         else if (header != null)
         {
@@ -84,14 +80,12 @@ public partial class CardView : ContentControl
             _viewHeaderPresenter.Content = header;
             _viewHeaderPresenter.IsVisible = true;
             _stringHeaderLabel.IsVisible = false;
-            _divider.IsVisible = true;
         }
         else
         {
             // 隐藏所有标题元素
             _stringHeaderLabel.IsVisible = false;
             _viewHeaderPresenter.IsVisible = false;
-            _divider.IsVisible = false;
         }
     }
 }

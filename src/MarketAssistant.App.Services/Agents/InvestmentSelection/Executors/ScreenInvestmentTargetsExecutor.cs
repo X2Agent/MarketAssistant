@@ -15,8 +15,8 @@ public sealed partial class ScreenInvestmentTargetsExecutor(
     IServiceProvider serviceProvider,
     ILogger<ScreenInvestmentTargetsExecutor> logger) : Executor("ScreenInvestmentTargets")
 {
-    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    private readonly ILogger<ScreenInvestmentTargetsExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly ILogger<ScreenInvestmentTargetsExecutor> _logger = logger;
 
     [MessageHandler]
     private async ValueTask<AssetScreeningResult> HandleAsync(
@@ -28,16 +28,7 @@ public sealed partial class ScreenInvestmentTargetsExecutor(
 
         try
         {
-            if (input?.Criteria == null)
-            {
-                throw new ArgumentNullException(nameof(input), "筛选条件不能为空");
-            }
-
             var originalRequest = input.OriginalRequest;
-            if (originalRequest == null)
-            {
-                throw new InvalidOperationException("缺少原始请求信息");
-            }
 
             // 根据市场类型获取对应的筛选服务（使用 Keyed Services）
             var screenerService = _serviceProvider.GetRequiredKeyedService<IAssetScreenerService>(originalRequest.MarketType);
@@ -57,17 +48,8 @@ public sealed partial class ScreenInvestmentTargetsExecutor(
                 OriginalRequest = originalRequest
             };
         }
-        catch (OperationCanceledException)
-        {
-            // 用户主动取消必须向上传播，不得包装成业务错误
-            throw;
-        }
-        catch (FriendlyException)
-        {
-            // FriendlyException 已包含用户友好信息，直接抛出避免双重包装丢失原始错误
-            throw;
-        }
-        catch (Exception ex)
+        // 取消与已带用户友好信息的 FriendlyException 原样上抛，不二次包装
+        catch (Exception ex) when (ex is not (OperationCanceledException or FriendlyException))
         {
             _logger.LogError(ex, "[步骤2/3] 投资标的筛选失败");
             throw new FriendlyException($"投资标的筛选失败: {ex.Message}", ex);

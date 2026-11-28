@@ -21,9 +21,9 @@ public interface ICriteriaGenerationStrategy<TCriteria> where TCriteria : IScree
     string BuildUserPrompt(InvestmentSelectionWorkflowRequest request);
 
     /// <summary>
-    /// 反序列化并验证筛选条件，使用请求中的数量上限覆盖模型输出。
+    /// 反序列化并验证筛选条件，候选池大小固定为 <see cref="IScreeningCriteria.CandidatePoolSize"/>，覆盖模型输出。
     /// </summary>
-    TCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request);
+    TCriteria DeserializeCriteria(string json);
 }
 
 /// <summary>
@@ -57,13 +57,11 @@ public abstract class CriteriaGenerationStrategyBase<TCriteria> : ICriteriaGener
             {source}：
             {request.Content}
 
-            推荐{label}数量限制：{request.MaxRecommendations}
-
             请根据{source}生成{label}筛选条件。
             """;
     }
 
-    public virtual TCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
+    public virtual TCriteria DeserializeCriteria(string json)
     {
         var criteria = LlmJsonExtractor.Deserialize<TCriteria>(json, DeserializationOptions);
         if (criteria == null)
@@ -71,7 +69,7 @@ public abstract class CriteriaGenerationStrategyBase<TCriteria> : ICriteriaGener
             throw new InvalidOperationException($"{AssetTypeLabel}筛选条件 JSON 解析失败");
         }
 
-        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
+        criteria.Limit = IScreeningCriteria.CandidatePoolSize;
         return criteria;
     }
 }

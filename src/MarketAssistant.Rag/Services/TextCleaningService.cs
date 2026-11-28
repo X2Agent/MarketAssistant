@@ -11,7 +11,7 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class TextCleaningService(ILogger<TextCleaningService> logger) : ITextCleaningService
 {
-    private readonly ILogger<TextCleaningService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger<TextCleaningService> _logger = logger;
 
     // 预编译的正则表达式 - 固定清洗规则
     private static readonly Regex MultiSpace = new(@"[\t\x0B\f ]{2,}", RegexOptions.Compiled);

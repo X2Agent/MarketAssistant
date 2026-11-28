@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Providers;
@@ -297,7 +296,7 @@ public partial class SettingsPageViewModel
 
     /// <summary>
     /// 模型目录拉取主体。<paramref name="forceRefresh"/> 为 false 时命中
-    /// <see cref="IModelDiscoveryService"/> 的会话级缓存即刻返回（初始化/切换服务商走此路径）。
+    /// <see cref="MarketAssistant.Infrastructure.Factories.IModelDiscoveryService"/> 的会话级缓存即刻返回（初始化/切换服务商走此路径）。
     /// </summary>
     private async Task FetchModelsCore(bool forceRefresh)
     {

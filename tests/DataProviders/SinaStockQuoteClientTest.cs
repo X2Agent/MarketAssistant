@@ -232,6 +232,31 @@ public sealed class SinaStockQuoteClientTest
         Assert.IsNull(await client.GetStockQuoteAsync("600519"), "缺少市场前缀");
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetStockQuoteAsync_RequestFailure_ShouldPropagate()
+    {
+        var client = new SinaStockQuoteClient(new NetworkFailureFactory());
+
+        await Assert.ThrowsExactlyAsync<HttpRequestException>(
+            () => client.GetStockQuoteAsync("sh600519"));
+    }
+
+    private sealed class NetworkFailureFactory : IHttpClientFactory
+    {
+        private sealed class Handler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request, CancellationToken cancellationToken)
+                => throw new HttpRequestException("模拟网络中断");
+        }
+
+        public HttpClient CreateClient(string name) => new(new Handler())
+        {
+            BaseAddress = new Uri("https://hq.sinajs.cn/")
+        };
+    }
+
     /// <summary>
     /// 故意在创建客户端时抛异常的工厂：验证不支持的代码在发起 HTTP 之前就被拦截。
     /// </summary>

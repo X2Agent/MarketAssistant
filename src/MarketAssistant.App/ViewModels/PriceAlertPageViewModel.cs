@@ -1,8 +1,6 @@
 using System.Collections.ObjectModel;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Applications;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Charts.Models;
@@ -100,15 +98,27 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     /// <summary>当前是否选中历史标签页。</summary>
     public bool IsHistoryTabSelected => SelectedTabIndex == 1;
 
+    /// <summary>当前是否选中规则标签页。</summary>
+    public bool IsRulesTabSelected => SelectedTabIndex == 0;
+
+    [RelayCommand]
+    private void SelectTab(string tabIndex)
+    {
+        if (int.TryParse(tabIndex, out var index))
+            SelectedTabIndex = index;
+    }
+
     /// <summary>告警历史子 ViewModel。</summary>
     public AlertHistoryViewModel AlertHistory { get; }
 
-    partial void OnSelectedTabIndexChanged(int value)
+    partial void OnSelectedTabIndexChanged(int oldValue, int newValue)
     {
         OnPropertyChanged(nameof(IsHistoryTabSelected));
+        OnPropertyChanged(nameof(IsRulesTabSelected));
 
-        // 进入历史标签页即视为已阅：清除未读徽标（MainWindowViewModel 经 AlertsChanged 刷新）
-        if (value == 1)
+        // 离开历史标签页才视为已阅：停留期间列表用强调点 + 字重区分未读，用户才看得出哪些是新的
+        // （MainWindowViewModel 经 AlertsChanged 刷新导航未读徽标）
+        if (oldValue == 1 && newValue != 1)
             _ = AlertHistory.MarkAllReadCommand.ExecuteAsync(null);
     }
 
@@ -312,7 +322,8 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
             "删除告警",
             $"确定要删除 {rule.AssetName}({rule.AssetCode}) 的告警规则吗？",
             "删除",
-            "取消");
+            "取消",
+            destructive: true);
         if (!confirmed) return;
 
         await SafeExecuteAsync(async () =>
@@ -370,6 +381,10 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     public void OnNavigatedFrom()
     {
         _assetLoadCts?.Cancel();
+
+        // 带着历史标签页离开页面同样视为已阅
+        if (IsHistoryTabSelected)
+            _ = AlertHistory.MarkAllReadCommand.ExecuteAsync(null);
     }
 
     public void Dispose()

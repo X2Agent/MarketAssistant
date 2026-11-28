@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Media;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 
 namespace MarketAssistant.Views.Windows;
 
@@ -17,12 +17,6 @@ public partial class NotificationWindow : Window
     private const int MaximumDisplayDuration = 12000;
     private const double MarginFromEdge = 16;
     private const double StackGap = 8;
-
-    // 图标底色对齐设计系统语义色（Colors.axaml 中 Success/Error/Warning/Info）
-    private static readonly Color SuccessColor = Color.Parse("#10B981");
-    private static readonly Color ErrorColor = Color.Parse("#EF4444");
-    private static readonly Color WarningColor = Color.Parse("#F59E0B");
-    private static readonly Color InfoColor = Color.Parse("#3B82F6");
 
     // 堆叠槽位（0 = 底部基准位，向上依次偏移），由 NotificationService 分配
     private int _slot;
@@ -45,7 +39,7 @@ public partial class NotificationWindow : Window
     }
 
     /// <summary>
-    /// 设置堆叠槽位，由 <see cref="NotificationService"/> 在显示前分配
+    /// 设置堆叠槽位，由 <see cref="MarketAssistant.Services.Notification.NotificationService"/> 在显示前分配
     /// </summary>
     public void SetStackSlot(int slot) => _slot = Math.Max(0, slot);
 
@@ -68,39 +62,20 @@ public partial class NotificationWindow : Window
     /// </summary>
     public void SetMessage(string message, NotificationType type)
     {
-        var messageText = this.FindControl<TextBlock>("MessageText");
-        if (messageText != null)
-        {
-            messageText.Text = message;
-        }
+        this.FindControl<TextBlock>("MessageText")!.Text = message;
 
-        var notificationBorder = this.FindControl<Border>("NotificationBorder");
-        if (notificationBorder?.Child is Grid grid && grid.Children.Count > 0)
+        var (badgeBrushKey, iconKey) = type switch
         {
-            // 第一个子元素是图标 Border
-            if (grid.Children[0] is Border iconBorder && iconBorder.Child is TextBlock iconText)
-            {
-                switch (type)
-                {
-                    case NotificationType.Success:
-                        iconBorder.Background = new SolidColorBrush(SuccessColor);
-                        iconText.Text = "✓";
-                        break;
-                    case NotificationType.Error:
-                        iconBorder.Background = new SolidColorBrush(ErrorColor);
-                        iconText.Text = "✕";
-                        break;
-                    case NotificationType.Warning:
-                        iconBorder.Background = new SolidColorBrush(WarningColor);
-                        iconText.Text = "!";
-                        break;
-                    case NotificationType.Info:
-                        iconBorder.Background = new SolidColorBrush(InfoColor);
-                        iconText.Text = "i";
-                        break;
-                }
-            }
-        }
+            NotificationType.Success => ("SuccessBrush", "CheckIcon"),
+            NotificationType.Error => ("ErrorBrush", "CloseIcon"),
+            NotificationType.Warning => ("WarningBrush", "ExclamationIcon"),
+            NotificationType.Info => ("AccentBrush", "InfoMarkIcon"),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
+        };
+
+        // 动态资源绑定：跟随主题切换，不在代码里写死颜色与几何
+        this.FindControl<Border>("StatusBadge")![!Border.BackgroundProperty] = new DynamicResourceExtension(badgeBrushKey);
+        this.FindControl<PathIcon>("StatusIcon")![!PathIcon.DataProperty] = new DynamicResourceExtension(iconKey);
     }
 
     /// <summary>

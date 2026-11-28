@@ -12,8 +12,8 @@ public sealed class CryptoMarketSnapshotService(
     BinanceMarketDataService binanceService,
     ILogger<CryptoMarketSnapshotService> logger) : IMarketSnapshotService
 {
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    private readonly ILogger<CryptoMarketSnapshotService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly BinanceMarketDataService _binanceService = binanceService;
+    private readonly ILogger<CryptoMarketSnapshotService> _logger = logger;
 
     public async Task<MarketSnapshot?> GetSnapshotAsync(string code, CancellationToken cancellationToken = default)
     {

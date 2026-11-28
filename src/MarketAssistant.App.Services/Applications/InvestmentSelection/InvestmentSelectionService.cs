@@ -12,8 +12,8 @@ public class InvestmentSelectionService(
     InvestmentSelectionWorkflow selectionWorkflow,
     ILogger<InvestmentSelectionService> logger)
 {
-    private readonly InvestmentSelectionWorkflow _selectionWorkflow = selectionWorkflow ?? throw new ArgumentNullException(nameof(selectionWorkflow));
-    private readonly ILogger<InvestmentSelectionService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly InvestmentSelectionWorkflow _selectionWorkflow = selectionWorkflow;
+    private readonly ILogger<InvestmentSelectionService> _logger = logger;
 
     #region 业务API接口
 
@@ -22,34 +22,25 @@ public class InvestmentSelectionService(
     /// </summary>
     public async Task<InvestmentSelectionResult> RecommendByUserRequirementAsync(
         InvestmentRecommendationRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        if (request == null || string.IsNullOrWhiteSpace(request.UserRequirements))
+        if (string.IsNullOrWhiteSpace(request.UserRequirements))
         {
             throw new ArgumentException("用户需求不能为空", nameof(request));
         }
 
-        try
-        {
-            _logger.LogInformation("开始基于用户需求的AI投资选择，市场: {Market}，需求: {Requirements}",
-                request.MarketType, request.UserRequirements);
+        _logger.LogInformation("开始基于用户需求的AI投资选择，市场: {Market}，需求: {Requirements}",
+            request.MarketType, request.UserRequirements);
 
-            var validatedRequest = ValidateAndNormalizeUserRequest(request);
+        var validatedRequest = ValidateAndNormalizeUserRequest(request);
 
-            var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, cancellationToken);
+        var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, progress, cancellationToken);
 
-            var optimizedResult = OptimizeUserBasedResult(result, validatedRequest);
+        _logger.LogInformation("用户需求投资选择完成，市场: {Market}，推荐数量: {Count}，置信度: {Confidence:F1}%",
+            request.MarketType, result.Recommendations.Count, result.ConfidenceScore);
 
-            _logger.LogInformation("用户需求投资选择完成，市场: {Market}，推荐数量: {Count}，置信度: {Confidence:F1}%",
-                request.MarketType, optimizedResult.Recommendations.Count, optimizedResult.ConfidenceScore);
-
-            return optimizedResult;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "基于用户需求的投资选择过程中发生错误");
-            throw;
-        }
+        return result;
     }
 
     /// <summary>
@@ -57,34 +48,30 @@ public class InvestmentSelectionService(
     /// </summary>
     public async Task<InvestmentSelectionResult> RecommendByNewsAsync(
         NewsBasedInvestmentRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        if (request == null)
+        _logger.LogInformation("开始基于热点新闻的AI投资选择，市场: {Market}，推荐数: {Max}",
+            request.MarketType, request.MaxRecommendations);
+
+        var validatedRequest = ValidateAndNormalizeNewsRequest(request);
+
+        var result = await _selectionWorkflow.AnalyzeNewsHotspotAsync(validatedRequest, progress, cancellationToken);
+
+        if (result.Recommendations.Count > validatedRequest.MaxRecommendations)
         {
-            request = new NewsBasedInvestmentRequest();
+            result.Recommendations = [.. result.Recommendations.Take(validatedRequest.MaxRecommendations)];
         }
 
-        try
+        foreach (var recommendation in result.Recommendations)
         {
-            _logger.LogInformation("开始基于热点新闻的AI投资选择，市场: {Market}，推荐数: {Max}",
-                request.MarketType, request.MaxRecommendations);
-
-            var validatedRequest = ValidateAndNormalizeNewsRequest(request);
-
-            var result = await _selectionWorkflow.AnalyzeNewsHotspotAsync(validatedRequest, cancellationToken);
-
-            var optimizedResult = OptimizeNewsBasedResult(result, validatedRequest);
-
-            _logger.LogInformation("热点新闻投资选择完成，市场: {Market}，推荐数量: {Count}，置信度: {Confidence:F1}%",
-                request.MarketType, optimizedResult.Recommendations.Count, optimizedResult.ConfidenceScore);
-
-            return optimizedResult;
+            recommendation.Reason = $"[新闻热点] {recommendation.Reason}";
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "基于热点新闻的投资选择过程中发生错误");
-            throw;
-        }
+
+        _logger.LogInformation("热点新闻投资选择完成，市场: {Market}，推荐数量: {Count}，置信度: {Confidence:F1}%",
+            request.MarketType, result.Recommendations.Count, result.ConfidenceScore);
+
+        return result;
     }
 
     /// <summary>
@@ -93,26 +80,19 @@ public class InvestmentSelectionService(
     public async Task<InvestmentSelectionResult> QuickSelectAsync(
         QuickSelectionStrategy strategy,
         MarketType marketType,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogInformation("开始执行快速选择，策略: {Strategy}, 市场: {Market}", strategy, marketType);
+        _logger.LogInformation("开始执行快速选择，策略: {Strategy}, 市场: {Market}", strategy, marketType);
 
-            var request = ConvertStrategyToUserRequest(strategy, marketType);
+        var request = ConvertStrategyToUserRequest(strategy, marketType);
 
-            var result = await RecommendByUserRequirementAsync(request, cancellationToken);
+        var result = await RecommendByUserRequirementAsync(request, progress, cancellationToken);
 
-            _logger.LogInformation("快速选择完成，策略: {Strategy}，结果数量: {Count}",
-                strategy, result.Recommendations.Count);
+        _logger.LogInformation("快速选择完成，策略: {Strategy}，结果数量: {Count}",
+            strategy, result.Recommendations.Count);
 
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "执行快速选择时发生错误，策略: {Strategy}", strategy);
-            throw;
-        }
+        return result;
     }
 
     /// <summary>
@@ -266,11 +246,7 @@ public class InvestmentSelectionService(
         {
             MarketType = request.MarketType,
             UserRequirements = request.UserRequirements?.Trim() ?? "",
-            InvestmentAmount = request.InvestmentAmount,
             RiskPreference = NormalizeRiskPreference(request.RiskPreference),
-            InvestmentHorizon = request.InvestmentHorizon,
-            PreferredSectors = request.PreferredSectors,
-            ExcludedSectors = request.ExcludedSectors,
             MaxRecommendations = Math.Clamp(request.MaxRecommendations, 1, 10)
         };
 
@@ -292,35 +268,6 @@ public class InvestmentSelectionService(
         };
 
         return normalized;
-    }
-
-    private InvestmentSelectionResult OptimizeUserBasedResult(InvestmentSelectionResult result, InvestmentRecommendationRequest request)
-    {
-        if (request.RiskPreference == "conservative")
-        {
-            result.Recommendations = [.. result.Recommendations.Where(r => r.RiskLevel != RiskLevel.High)];
-        }
-        else if (request.RiskPreference == "aggressive")
-        {
-            result.Recommendations = [.. result.Recommendations.OrderByDescending(r => r.ExpectedReturn ?? 0)];
-        }
-
-        return result;
-    }
-
-    private InvestmentSelectionResult OptimizeNewsBasedResult(InvestmentSelectionResult result, NewsBasedInvestmentRequest request)
-    {
-        if (result.Recommendations.Count > request.MaxRecommendations)
-        {
-            result.Recommendations = [.. result.Recommendations.Take(request.MaxRecommendations)];
-        }
-
-        foreach (var recommendation in result.Recommendations)
-        {
-            recommendation.Reason = $"[新闻热点] {recommendation.Reason}";
-        }
-
-        return result;
     }
 
     private InvestmentRecommendationRequest ConvertStrategyToUserRequest(QuickSelectionStrategy strategy, MarketType marketType)

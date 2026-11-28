@@ -18,8 +18,8 @@ public sealed class CryptoOrderBookService(
     /// <summary>币安 depth 接口允许的档位值；其它值会被服务端拒绝。</summary>
     private static readonly int[] AllowedLimits = [5, 10, 20, 50, 100, 500, 1000, 5000];
 
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    private readonly ILogger<CryptoOrderBookService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly BinanceMarketDataService _binanceService = binanceService;
+    private readonly ILogger<CryptoOrderBookService> _logger = logger;
 
     public async Task<OrderBookSnapshot?> GetOrderBookAsync(
         string code,

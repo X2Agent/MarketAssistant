@@ -149,6 +149,34 @@ public sealed class SignalAlertEvaluatorTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public async Task NotifyStrategyConfigurationPaused_ShouldRaiseSignalWarning()
+    {
+        await _evaluator.NotifyStrategyConfigurationPausedSafeAsync(
+            CreateStrategy(), "AI 策略参数 JSON 损坏");
+
+        Assert.HasCount(1, _alertCenter.Raised);
+        var alert = _alertCenter.Raised[0];
+        Assert.AreEqual(AlertSource.Signal, alert.Source);
+        Assert.AreEqual(AlertLevel.Warning, alert.Level);
+        Assert.AreEqual("AI 策略配置无效已暂停", alert.Title);
+        Assert.Contains("AI 策略参数 JSON 损坏", alert.Content);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task NotifyStrategyConfigurationPaused_AlertCenterFailure_ShouldNotThrow()
+    {
+        var throwingCenter = new ThrowingAlertCenter();
+        var evaluator = new SignalAlertEvaluator(
+            throwingCenter, LoggerFactory.Create(_ => { }).CreateLogger<SignalAlertEvaluator>());
+
+        await evaluator.NotifyStrategyConfigurationPausedSafeAsync(CreateStrategy(), "AI 策略缺少参数");
+
+        Assert.IsTrue(throwingCenter.Called);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public async Task NotifyStrategyCompleted_AlertCenterFailure_ShouldNotThrow()
     {
         var throwingCenter = new ThrowingAlertCenter();

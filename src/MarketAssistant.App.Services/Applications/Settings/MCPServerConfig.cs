@@ -1,12 +1,20 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
-/// MCP服务器配置类
+/// MCP服务器配置类。
+/// 仅 <see cref="IsEnabled"/> 参与变更通知——MCP 配置页的服务器列表行用开关直接切换启用状态，
+/// 需要它把变化推回 UI；其余属性只在编辑表单里读写，走普通的「保存」提交，无需通知。
 /// </summary>
-public class MCPServerConfig
+public class MCPServerConfig : INotifyPropertyChanged
 {
+    private bool _isEnabled = true;
+
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     /// <summary>
     /// 服务器ID，用于唯一标识
     /// </summary>
@@ -44,9 +52,18 @@ public class MCPServerConfig
     public Dictionary<string, string?> EnvironmentVariables { get; set; } = [];
 
     /// <summary>
-    /// 是否启用
+    /// 是否启用。列表行的开关直接绑定它并即时落库，因此需要变更通知。
     /// </summary>
-    public bool IsEnabled { get; set; } = true;
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (_isEnabled == value) return;
+            _isEnabled = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
+        }
+    }
 
     /// <summary>
     /// 工具分组标签，用于工具的选择性暴露
@@ -77,24 +94,4 @@ public class MCPServerConfig
     /// </summary>
     public int ToolsSchemaVersion { get; set; }
 
-    /// <summary>
-    /// 获取传输选项字典
-    /// </summary>
-    /// <returns>传输选项字典</returns>
-    public Dictionary<string, string> GetTransportOptions()
-    {
-        var options = new Dictionary<string, string>();
-
-        if (TransportType == "stdio")
-        {
-            options["command"] = Command;
-            options["arguments"] = Arguments;
-        }
-        else if (TransportType == "sse" || TransportType == "streamableHttp")
-        {
-            options["url"] = Command; // 对于SSE和StreamableHttp类型，Command字段存储URL
-        }
-
-        return options;
-    }
 }

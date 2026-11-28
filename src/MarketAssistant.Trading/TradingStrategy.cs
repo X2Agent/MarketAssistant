@@ -33,9 +33,19 @@ public class TradingStrategy
     [Description("滑点容忍度（0-1），仅限价单生效")]
     public decimal SlippageTolerance { get; set; } = 0.003m;
 
+    /// <summary>展示用数量描述：定投按 USDT 金额，其余按标的数量；去掉多余的尾随 0。</summary>
     public string QuantityLabel => Type == StrategyType.DCA
-        ? $"定投: {Quantity:F2} USDT"
-        : $"数量: {Quantity:F6}";
+        ? $"定投 {Quantity:0.##} USDT"
+        : $"数量 {Quantity:0.########}";
+
+    /// <summary>是否有固定触发价。AI 信号等不依赖单一价位的策略为 0，展示层据此隐藏“触发价 0”。</summary>
+    public bool HasTriggerPrice => TriggerPrice > 0;
+
+    /// <summary>展示用执行次数：设置了上限时显示“已执行 3/10 次”，否则“已执行 3 次”。</summary>
+    public string ExecutionCountText => MaxExecutions is { } max
+        ? $"已执行 {ExecutionCount}/{max} 次"
+        : $"已执行 {ExecutionCount} 次";
+
     [Description("最大仓位占比限制（%）")]
     public decimal? MaxPositionPercent { get; set; }
     [Description("自定义策略参数（JSON）")]

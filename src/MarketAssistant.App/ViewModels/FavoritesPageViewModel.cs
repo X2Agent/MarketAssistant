@@ -1,19 +1,15 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Favorites;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
@@ -320,7 +316,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
             if (_assetIndex.TryGetValue(symbol, out var asset))
             {
-                asset.CurrentPrice = PriceFormatter.Format(update.Price);
+                asset.CurrentPrice = PriceFormatter.Format(update.Price, _marketContext.CurrentMarket, asset.Code);
                 // InvariantCulture 与 PriceChangeColorConverter 的解析端保持同一 culture，否则逗号小数区域下解析失败标签变灰
                 asset.ChangePercentage = update.Change.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "%";
             }

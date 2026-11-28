@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Navigation;
@@ -10,6 +9,14 @@ using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
 namespace MarketAssistant.ViewModels;
+
+public enum McpTestStatusKind
+{
+    None,
+    Success,
+    Warning,
+    Failed
+}
 
 /// <summary>
 /// MCP服务器配置页ViewModel - 对应 MCPServerConfigViewModel
@@ -53,6 +60,16 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private string _testStatus = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTestStatusSuccessful))]
+    [NotifyPropertyChangedFor(nameof(IsTestStatusWarning))]
+    [NotifyPropertyChangedFor(nameof(IsTestStatusFailed))]
+    private McpTestStatusKind _testStatusKind;
+
+    public bool IsTestStatusSuccessful => TestStatusKind == McpTestStatusKind.Success;
+    public bool IsTestStatusWarning => TestStatusKind == McpTestStatusKind.Warning;
+    public bool IsTestStatusFailed => TestStatusKind == McpTestStatusKind.Failed;
+
     // 编辑中的属性
     [ObservableProperty]
     private string _name = string.Empty;
@@ -93,9 +110,6 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
     [ObservableProperty]
     private string _environmentVariablesText = string.Empty;
-
-    [ObservableProperty]
-    private bool _isEnabled = true;
 
     [ObservableProperty]
     private bool _allowAllTools;
@@ -143,7 +157,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     /// </summary>
     private void LoadServerConfigs()
     {
-        try
+        SafeExecute(() =>
         {
             _configService.LoadConfigs();
             ServerConfigs.Clear();
@@ -153,12 +167,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             }
 
             PromoteLegacyToolWhitelistConfigs();
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "加载MCP服务器配置失败");
-            _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "加载配置"));
-        }
+        }, "加载MCP配置");
     }
 
     /// <summary>
@@ -181,7 +190,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
         var serverNames = legacyEnabledConfigs
             .Select(config => string.IsNullOrWhiteSpace(config.Name) ? config.Id : config.Name);
-        _notificationService?.ShowWarning(
+        _notificationService.ShowWarning(
             "MCP 工具白名单机制已升级：未勾选工具的服务器默认不向 Agent 暴露任何工具。" +
             $"请进入 MCP 配置页为「{string.Join("、", serverNames)}」重新勾选工具，或开启“允许全部工具”。",
             10000);
@@ -247,6 +256,35 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     }
 
     /// <summary>
+    /// 列表行内启停某台 MCP 服务器：立即落盘并使工具缓存失效。
+    /// 只改 IsEnabled 这一个字段，与编辑表单的「保存」互不干扰。
+    /// </summary>
+    [RelayCommand]
+    private void ToggleServerEnabled(MCPServerConfig? config)
+    {
+        if (config is null)
+        {
+            return;
+        }
+
+        SafeExecute(() =>
+        {
+            config.IsEnabled = !config.IsEnabled;
+            try { _configService.AddOrUpdateConfig(config); }
+            catch { config.IsEnabled = !config.IsEnabled; throw; }
+            _mcpToolProvider.Invalidate();
+
+            // 正在编辑同一台服务器时同步表单字段，否则点「保存」会把开关拨回原值
+            if (_editingConfig is not null && _editingConfig.Id == config.Id)
+            {
+                _editingConfig.IsEnabled = config.IsEnabled;
+            }
+
+            Logger?.LogInformation("MCP 服务器启用状态切换: {Name} -> {Enabled}", config.Name, config.IsEnabled);
+        }, "切换 MCP 服务器状态");
+    }
+
+    /// <summary>
     /// 保存服务器
     /// </summary>
     [RelayCommand]
@@ -260,13 +298,14 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             return;
         }
 
-        try
+        var editingConfig = _editingConfig;
+        SafeExecute(() =>
         {
             // 更新配置对象
-            SaveUIToConfig(_editingConfig);
+            SaveUIToConfig(editingConfig);
 
             // 保存到服务
-            _configService.AddOrUpdateConfig(_editingConfig);
+            _configService.AddOrUpdateConfig(editingConfig);
 
             // 刷新列表并使工具缓存失效
             LoadServerConfigs();
@@ -275,14 +314,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             _editingConfig = null;
             _editingSource = null;
 
-            _notificationService?.ShowSuccess("保存成功");
+            _notificationService.ShowSuccess("保存成功");
             Logger?.LogInformation("MCP服务器配置已保存: {Name}", Name);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "保存MCP服务器配置失败");
-            _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "保存配置"));
-        }
+        }, "保存MCP配置");
     }
 
     /// <summary>
@@ -333,6 +367,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         }
 
         IsTesting = true;
+        TestStatusKind = McpTestStatusKind.None;
         TestStatus = "正在连接...";
 
         try
@@ -364,27 +399,31 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
                 if (toolCount > 0)
                 {
+                    TestStatusKind = McpTestStatusKind.Success;
                     TestStatus = $"连接成功！发现 {toolCount} 个工具";
-                    _notificationService?.ShowSuccess($"连接成功！MCP服务器提供 {toolCount} 个工具");
+                    _notificationService.ShowSuccess($"连接成功！MCP服务器提供 {toolCount} 个工具");
                     Logger?.LogInformation("MCP服务器测试连接成功: {Name}, 工具数: {Count}", Name, toolCount);
                 }
                 else
                 {
+                    TestStatusKind = McpTestStatusKind.Warning;
                     TestStatus = "连接成功，但未发现可用工具";
-                    _notificationService?.ShowWarning("连接成功，但未发现可用工具");
+                    _notificationService.ShowWarning("连接成功，但未发现可用工具");
                     Logger?.LogWarning("MCP服务器连接成功但无工具: {Name}", Name);
                 }
             }
             catch (OperationCanceledException)
             {
+                TestStatusKind = McpTestStatusKind.Failed;
                 TestStatus = "连接超时";
-                _notificationService?.ShowError("连接超时，请检查服务器配置");
+                _notificationService.ShowError("连接超时，请检查服务器配置");
                 Logger?.LogWarning("MCP服务器连接超时: {Name}", Name);
             }
             catch (Exception ex)
             {
+                TestStatusKind = McpTestStatusKind.Failed;
                 TestStatus = "连接失败";
-                _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "连接"));
+                _notificationService.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "连接"));
                 Logger?.LogError(ex, "MCP服务器测试连接失败: {Name}", Name);
             }
         }
@@ -411,7 +450,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             "确认删除",
             "确定要删除此服务器配置吗？此操作无法撤销。",
             "删除",
-            "取消");
+            "取消",
+            destructive: true);
 
         if (confirmed)
         {
@@ -421,7 +461,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             IsEditing = false;
             _editingConfig = null;
             _editingSource = null;
-            _notificationService?.ShowSuccess("删除成功");
+            _notificationService.ShowSuccess("删除成功");
         }
     }
 
@@ -435,6 +475,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             return;
 
         IsTesting = true;
+        TestStatusKind = McpTestStatusKind.None;
         TestStatus = "正在连接服务器获取工具列表...";
         try
         {
@@ -456,10 +497,12 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
                 });
             }
             TestStatus = $"已加载 {tools.Count} 个工具";
+            TestStatusKind = tools.Count > 0 ? McpTestStatusKind.Success : McpTestStatusKind.Warning;
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "加载 MCP 工具列表失败");
+            TestStatusKind = McpTestStatusKind.Failed;
             TestStatus = $"加载工具列表失败: {ex.Message}";
         }
         finally
@@ -481,7 +524,6 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         TransportType = config.TransportType ?? "stdio";
         Command = config.Command ?? string.Empty;
         Arguments = config.Arguments ?? string.Empty;
-        IsEnabled = config.IsEnabled;
         AllowAllTools = config.AllowAllTools;
 
         // 依据已保存的白名单回填勾选态（描述在“加载工具列表”后补全）
@@ -493,6 +535,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
         if (!config.AllowAllTools && config.AllowedTools.Count == 0)
         {
+            TestStatusKind = McpTestStatusKind.Warning;
             TestStatus = "该服务器尚未勾选任何工具，当前不会暴露任何工具，请点击加载工具列表后勾选";
         }
 
@@ -522,7 +565,6 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         config.TransportType = TransportType;
         config.Command = Command;
         config.Arguments = Arguments;
-        config.IsEnabled = IsEnabled;
         config.AllowAllTools = AllowAllTools;
         config.ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion;
         config.AllowedTools = AllowAllTools
@@ -688,7 +730,6 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             || !string.Equals(TransportType, _editingConfig.TransportType, StringComparison.Ordinal)
             || !string.Equals(Command, _editingConfig.Command, StringComparison.Ordinal)
             || !string.Equals(Arguments, _editingConfig.Arguments, StringComparison.Ordinal)
-            || IsEnabled != _editingConfig.IsEnabled
             || !AreDictionariesEqual(ParseEnvironmentVariables(), _editingConfig.EnvironmentVariables)
             || !AreAllowedToolsEqual();
     }
@@ -755,20 +796,13 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
     private void LoadAuditEntries()
     {
-        try
+        var entries = _auditLogger.GetRecentEntries();
+        AuditEntries.Clear();
+        foreach (var entry in entries)
         {
-            var entries = _auditLogger.GetRecentEntries();
-            AuditEntries.Clear();
-            foreach (var entry in entries)
-            {
-                AuditEntries.Add(entry);
-            }
+            AuditEntries.Add(entry);
+        }
 
-            HasAuditEntries = AuditEntries.Count > 0;
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "加载 MCP 工具审计记录失败");
-        }
+        HasAuditEntries = AuditEntries.Count > 0;
     }
 }

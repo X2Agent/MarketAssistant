@@ -1,0 +1,29 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ================================================================== -->
+    <!-- 状态圆点：进度类视图共用（AI 分析进度、AI 选股进度）                     -->
+    <!--                                                                     -->
+    <!-- 尺寸令牌 StatusDotSize 在 Spacing.axaml，外层容器用 IndicatorSize 留白。   -->
+    <!-- 四态由使用方按语义取色：                                              -->
+    <!--   运行中 = AccentBrush + PulseDot 呼吸；等待 = TextSecondaryBrush(40%)；  -->
+    <!--   完成 = SuccessBrush；失败 = ErrorBrush。                              -->
+    <!-- ================================================================== -->
+
+    <!-- 运行中的呼吸点 -->
+    <Style Selector="Ellipse.PulseDot">
+        <Style.Animations>
+            <Animation Duration="0:0:1.2" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Opacity" Value="1"/>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+</Styles>

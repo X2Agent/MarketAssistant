@@ -11,7 +11,8 @@ namespace MarketAssistant.DataProviders;
 /// </summary>
 public sealed class BinanceWebSocketService(ILogger<BinanceWebSocketService> logger) : IAsyncDisposable, IDisposable
 {
-    private const string WsBaseUrl = "wss://stream.binance.com:9443/stream?streams=";
+    // 币安只读行情主机：与 stream.binance.com 推送一致，但不受地区限制（后者握手在部分出口 IP 返回 451）
+    private const string WsBaseUrl = "wss://data-stream.binance.vision/stream?streams=";
     private const int ReconnectDelayMs = 5000;
     private readonly ILogger<BinanceWebSocketService> _logger = logger;
     private ClientWebSocket? _ws;

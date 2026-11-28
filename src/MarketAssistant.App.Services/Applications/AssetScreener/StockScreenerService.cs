@@ -14,20 +14,40 @@ public sealed class StockScreenerService(
     CookieContainer xueqiuCookieContainer,
     ILogger<StockScreenerService> logger) : IAssetScreenerService
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly CookieContainer _cookieContainer = xueqiuCookieContainer ?? throw new ArgumentNullException(nameof(xueqiuCookieContainer));
-    private readonly ILogger<StockScreenerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly CookieContainer _cookieContainer = xueqiuCookieContainer;
+    private readonly ILogger<StockScreenerService> _logger = logger;
 
     private const string ScreenerEndpoint = "/service/screener/screen";
 
     /// <summary>
-    /// 需要拼接报告期日期后缀的财务指标（格式：field.YYYYMMDD=min_max）
+    /// 累计类财务指标（格式：field.YYYYMMDD=min_max）：数值按报告期逐季累加且未年化，取年报才与阈值口径一致
     /// </summary>
-    private static readonly HashSet<string> Adj1Fields = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> CumulativeFields = new(StringComparer.OrdinalIgnoreCase)
     {
-        "roediluted", "eps", "bps", "npay", "netprofit",
-        "total_revenue", "oiy", "niota"
+        "roediluted", "eps", "bps", "netprofit", "total_revenue", "niota"
     };
+
+    /// <summary>
+    /// 同比增速类财务指标（格式：field.YYYYMMDD=min_max）：按披露截止日取最近一期已披露完的季报
+    /// </summary>
+    private static readonly HashSet<string> GrowthFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "npay", "oiy"
+    };
+
+    /// <summary>
+    /// 第 3 步分析依赖的关键列：条件没涉及时用 <see cref="WideRange"/> 补列。
+    /// 补列会剔除这些字段为空的股票（2026-11-28 实测全部合计约 7%，其中 pct20/pct60/mc 无影响）；
+    /// 不含 dy_l：补它会让候选池缩小 37.5%（大量公司不分红）。
+    /// </summary>
+    private static readonly string[] AnalysisColumns =
+        ["mc", "pettm", "pb", "roediluted", "npay", "oiy", "amount", "tr", "pct20", "pct60"];
+
+    /// <summary>
+    /// 补列用的宽区间（覆盖所有可能取值，含负值）
+    /// </summary>
+    private const string WideRange = "-99999999999999_99999999999999";
 
     /// <summary>
     /// 标识字段和元数据字段，动态解析时跳过（不放入 Indicators 字典）。
@@ -76,14 +96,14 @@ public sealed class StockScreenerService(
             throw new ArgumentException("筛选条件类型错误，期望 StockCriteria", nameof(criteria));
         }
 
-        _logger.LogInformation("开始雪球选股，条件数量: {Count}, 限制: {Limit}",
+        _logger.LogInformation("开始雪球选股，条件数量: {Count}, 候选池: {Limit}",
             stockCriteria.Criteria.Count, stockCriteria.Limit);
 
         try
         {
             await EnsureCookiesAsync(cancellationToken);
 
-            var queryParams = BuildQueryParams(stockCriteria);
+            var queryParams = BuildQueryParams(stockCriteria, DateOnly.FromDateTime(DateTime.Now));
             var stocks = await FetchFromXueqiuAsync(queryParams, cancellationToken);
 
             _logger.LogInformation("雪球选股完成，结果数量: {Count}", stocks.Count);
@@ -124,40 +144,44 @@ public sealed class StockScreenerService(
     }
 
     /// <summary>
-    /// 获取最新可用财报报告期日期（YYYYMMDD 格式）。
-    /// 当前日期减 30 天，取最近一个已结束的季度末。
+    /// 按指标口径选择财报报告期（YYYYMMDD 格式）。
+    /// 累计类取最近完整年报：一季报的 ROE 只有全年的约 1/4，同一阈值在不同月份命中数相差十几倍
+    /// （2026-11-28 实测 ROE≥10：一季报 73 家、年报 1092 家）；4 月 30 日披露截止，5 月起取上一年年报，1–4 月取前年年报。
+    /// 增速类按披露截止日取最近一期已披露完的季报：5–8 月一季报，9–10 月半年报，11–12 月三季报，1–4 月上年三季报，
+    /// 避免取到只披露了一部分公司的报告期。
     /// </summary>
-    private static string GetLatestReportingPeriod()
+    internal static string GetReportingPeriod(DateOnly today, bool isGrowthIndicator)
     {
-        var referenceDate = DateTime.Now.AddDays(-30);
-        var year = referenceDate.Year;
-        var month = referenceDate.Month;
-
-        var quarterEndMonth = month switch
+        if (!isGrowthIndicator)
         {
-            >= 10 => 9,
-            >= 7 => 6,
-            >= 4 => 3,
-            _ => 12
-        };
-
-        if (quarterEndMonth == 12)
-        {
-            year--;
+            return today.Month >= 5 ? $"{today.Year - 1}1231" : $"{today.Year - 2}1231";
         }
 
-        var day = quarterEndMonth switch
+        return today.Month switch
         {
-            3 => "0331",
-            6 => "0630",
-            9 => "0930",
-            _ => "1231"
+            >= 11 => $"{today.Year}0930",
+            >= 9 => $"{today.Year}0630",
+            >= 5 => $"{today.Year}0331",
+            _ => $"{today.Year - 1}0930"
         };
-
-        return $"{year}{day}";
     }
 
-    private string BuildQueryParams(StockCriteria criteria)
+    /// <summary>
+    /// 把指标代码转成雪球查询键：财务指标拼接报告期后缀（field.YYYYMMDD），行情指标原样使用。
+    /// </summary>
+    private static string ResolveFieldKey(string code, DateOnly today)
+    {
+        if (CumulativeFields.Contains(code))
+        {
+            return $"{code}.{GetReportingPeriod(today, isGrowthIndicator: false)}";
+        }
+
+        return GrowthFields.Contains(code)
+            ? $"{code}.{GetReportingPeriod(today, isGrowthIndicator: true)}"
+            : code;
+    }
+
+    internal static string BuildQueryParams(StockCriteria criteria, DateOnly today)
     {
         var exchange = criteria.Market switch
         {
@@ -173,39 +197,35 @@ public sealed class StockScreenerService(
             indcode = code;
         }
 
-        var reportingPeriod = GetLatestReportingPeriod();
-
         var filterParts = new List<string>();
         foreach (var condition in criteria.Criteria)
         {
             var min = condition.MinValue?.ToString(CultureInfo.InvariantCulture) ?? "";
             var max = condition.MaxValue?.ToString(CultureInfo.InvariantCulture) ?? "";
-            var filterValue = $"{min}_{max}";
-
-            var fieldKey = Adj1Fields.Contains(condition.Code)
-                ? $"{condition.Code}.{reportingPeriod}"
-                : condition.Code;
-
-            filterParts.Add($"{fieldKey}={filterValue}");
+            filterParts.Add($"{ResolveFieldKey(condition.Code, today)}={min}_{max}");
         }
 
-        var orderField = criteria.Criteria.Count > 0 ? criteria.Criteria[0].Code : "mc";
-        var orderByParam = Adj1Fields.Contains(orderField)
-            ? $"{orderField}.{reportingPeriod}"
-            : orderField;
+        // 排序键固定为规模与流动性优先（含成交额条件按成交额，否则按总市值），一律降序：
+        // 条件只决定谁有资格入池。原先按"第一个条件 + 降序"取池，会让候选贴着条件的边缘或极端值
+        // （2026-11-28 实测：价值股池 PE 全在 39.7–39.9，成长股增速中位数 369%/727%，高股息池最高 18.8% 的小盘）。
+        var orderField = criteria.Criteria.Any(c => c.Code.Equals("amount", StringComparison.OrdinalIgnoreCase))
+            ? "amount"
+            : "mc";
 
-        // 确保 mc（总市值）始终包含在查询中，使响应包含市值数据
-        var hasMc = orderByParam.Equals("mc", StringComparison.OrdinalIgnoreCase) ||
-                    criteria.Criteria.Any(c => c.Code.Equals("mc", StringComparison.OrdinalIgnoreCase));
-        if (!hasMc)
+        // 雪球响应只包含查询里出现的列：条件没涉及的关键指标用宽区间条件补出来，否则每只候选只有约 8 个字段，
+        // 第 3 步看不到估值、盈利、成长、资金与趋势数据。
+        foreach (var column in AnalysisColumns)
         {
-            filterParts.Add("mc=0_99999999999999");
+            if (!criteria.Criteria.Any(c => c.Code.Equals(column, StringComparison.OrdinalIgnoreCase)))
+            {
+                filterParts.Add($"{ResolveFieldKey(column, today)}={WideRange}");
+            }
         }
 
         var filterString = filterParts.Count > 0 ? "&" + string.Join("&", filterParts) : "";
 
         return $"category=CN&exchange={exchange}&indcode={indcode}" +
-               $"&order_by={orderByParam}&order=desc&page=1&size={criteria.Limit}&only_count=0" +
+               $"&order_by={orderField}&order=desc&page=1&size={criteria.Limit}&only_count=0" +
                filterString;
     }
 

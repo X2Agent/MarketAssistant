@@ -1,51 +1,53 @@
 using System.Net.Http.Json;
-using MarketAssistant.DataProviders.Web3;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.DataProviders.Web3;
 
 /// <summary>
-/// GoPlus Security 客户端：代币安全审计与蜜罐检测（EVM 多链 + Solana 专用端点）。
+/// GoPlus Security 客户端：代币安全审计与蜜罐检测（EVM 主端点与 Solana 专用端点，两者返回结构不同）。
 /// API 域名为 api.gopluslabs.io；链 ID 词汇统一经 ChainRegistry 归一化。
 /// </summary>
 public sealed class GoPlusSecurityClient(IHttpClientFactory httpClientFactory, ILogger<GoPlusSecurityClient> logger)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly ILogger<GoPlusSecurityClient> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<GoPlusSecurityClient> _logger = logger;
 
     /// <summary>可选 API Key，由上层（如用户设置服务）在运行时注入。</summary>
     public string? ApiKey { get; set; }
 
     /// <summary>
-    /// 查询代币安全审计结果（含蜜罐检测、税率、增发/黑名单/暂停交易等风险项）。
-    /// Solana 代币自动路由到 GoPlus 专用 Solana 端点。
+    /// 查询 EVM 链代币安全审计结果（含蜜罐检测、税率、增发/黑名单/暂停交易等风险项）。
+    /// Solana 请使用 <see cref="GetSolanaTokenSecurityAsync"/>。
     /// </summary>
-    /// <param name="chainId">链 ID，支持规范名（ethereum/bsc/solana 等）及数字、别名等常见写法</param>
-    /// <param name="tokenAddress">代币合约地址（Solana 为 mint 地址，保留大小写）</param>
+    /// <param name="chainId">链 ID，支持规范名（ethereum/bsc 等）及数字、别名等常见写法</param>
+    /// <param name="tokenAddress">代币合约地址</param>
     public async Task<GoPlusTokenSecurity?> GetTokenSecurityAsync(string chainId, string tokenAddress, CancellationToken cancellationToken = default)
     {
-        var canonical = ChainRegistry.Normalize(chainId);
-        var normalAddress = tokenAddress?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(normalAddress))
-            throw new FriendlyException("代币安全审计需要提供合约地址");
+        var address = NormalizeAddress(tokenAddress);
+        var goPlusChainId = ResolveGoPlusChainId(ChainRegistry.Normalize(chainId));
+        return await QuerySecurityAsync<GoPlusTokenSecurity>(
+            $"api/v1/token_security/{goPlusChainId}?contract_addresses={Uri.EscapeDataString(address)}",
+            address,
+            cancellationToken);
+    }
 
-        var isSolana = canonical == "solana";
-        var goPlusChainId = isSolana ? null : ResolveGoPlusChainId(canonical);
-        var url = isSolana
-            ? $"api/v1/solana/token_security?contract_addresses={Uri.EscapeDataString(normalAddress)}"
-            : $"api/v1/token_security/{goPlusChainId}?contract_addresses={Uri.EscapeDataString(normalAddress)}";
+    /// <summary>
+    /// 查询 Solana 代币安全审计结果（专用端点：增发/冻结/关闭等权限项、转账钩子、恶意地址标记）。
+    /// </summary>
+    /// <param name="tokenAddress">代币 mint 地址（保留大小写）</param>
+    public async Task<GoPlusSolanaTokenSecurity?> GetSolanaTokenSecurityAsync(string tokenAddress, CancellationToken cancellationToken = default)
+    {
+        var address = NormalizeAddress(tokenAddress);
+        return await QuerySecurityAsync<GoPlusSolanaTokenSecurity>(
+            $"api/v1/solana/token_security?contract_addresses={Uri.EscapeDataString(address)}",
+            address,
+            cancellationToken);
+    }
 
-        var data = await ExecuteAsync<GoPlusSecurityResponse>(url, cancellationToken);
-        if (data?.Result is not { Count: > 0 })
-            return null;
-
-        var lookupKey = isSolana ? normalAddress : normalAddress.ToLowerInvariant();
-        if (data.Result.TryGetValue(lookupKey, out var security))
-            return security;
-
-        // GoPlus 返回的 result 键大小写不保证与入参一致，未精确命中时忽略大小写匹配目标地址；仍未命中则返回 null
-        return data.Result.FirstOrDefault(kv =>
-            string.Equals(kv.Key, normalAddress, StringComparison.OrdinalIgnoreCase)).Value;
+    private static string NormalizeAddress(string tokenAddress)
+    {
+        var address = tokenAddress.Trim();
+        return address.Length > 0 ? address : throw new FriendlyException("代币安全审计需要提供合约地址");
     }
 
     /// <summary>
@@ -62,13 +64,14 @@ public sealed class GoPlusSecurityClient(IHttpClientFactory httpClientFactory, I
             return canonical;
 
         throw new FriendlyException(
-            $"GoPlus 暂不支持该链: {canonical}，支持的主要链：ethereum、bsc、polygon、arbitrum、optimism、avalanche、base（Solana 自动路由专用端点，也可直接使用数字链 ID）");
+            $"GoPlus 暂不支持该链: {canonical}，支持的主要链：ethereum、bsc、polygon、arbitrum、optimism、avalanche、base（也可直接使用数字链 ID；Solana 走专用端点）");
     }
 
     /// <summary>
-    /// 统一执行 GET 请求并解析 GoPlus 包装响应（code 1 = 成功）。
+    /// 执行 GET 请求并解析 GoPlus 包装响应（code 1 = 成功），取出目标地址对应的审计数据；未命中返回 null。
+    /// GoPlus 返回的 result 键大小写不保证与入参一致，故忽略大小写匹配。
     /// </summary>
-    private async Task<T?> ExecuteAsync<T>(string url, CancellationToken cancellationToken) where T : class
+    private async Task<TSecurity?> QuerySecurityAsync<TSecurity>(string url, string address, CancellationToken cancellationToken) where TSecurity : class
     {
         _logger.LogDebug("调用 GoPlus API: {Url}", url);
         try
@@ -78,12 +81,13 @@ public sealed class GoPlusSecurityClient(IHttpClientFactory httpClientFactory, I
                 httpClient.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey);
 
-            var response = await httpClient.GetFromJsonAsync<T>(url, cancellationToken);
+            var response = await httpClient.GetFromJsonAsync<GoPlusResponse<TSecurity>>(url, cancellationToken);
 
-            if (response is GoPlusSecurityResponse sec && sec.Code != 1)
-                throw new FriendlyException($"GoPlus 安全审计返回错误: {sec.Message ?? sec.Code.ToString()}");
+            if (response is { Code: not 1 })
+                throw new FriendlyException($"GoPlus 安全审计返回错误: {response.Message ?? response.Code.ToString()}");
 
-            return response;
+            return response?.Result?.FirstOrDefault(pair =>
+                string.Equals(pair.Key, address, StringComparison.OrdinalIgnoreCase)).Value;
         }
         catch (HttpRequestException ex) when (ex.HttpRequestError == HttpRequestError.SecureConnectionError)
         {

@@ -1,12 +1,13 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Services.Market;
 
 /// <summary>
 /// 虚拟币顶栏行情条：全网总市值+24h涨跌幅、BTC 主导率（CoinGecko /global 单次请求）
 /// 与恐惧贪婪指数（alternative.me）。三项均为市场级聚合指标，非具体标的价格。
-/// 任一数据源失败仅省略对应项，全失败返回空集合（顶栏整体隐藏）。
+/// 任一数据源失败仅省略对应项，全部失败抛出，由 UI 区分故障与正常无数据。
 /// </summary>
 public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, AlternativeMeClient alternativeMe) : IIndexQuoteService
 {
@@ -16,13 +17,22 @@ public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, Alter
     public async Task<IReadOnlyList<IndexQuoteItem>> GetLatestAsync(CancellationToken cancellationToken = default)
     {
         // 两个独立数据源并行拉取，互不阻塞
-        var globalTask = SafeAsync(() => _coinGecko.GetGlobalStatsAsync(cancellationToken));
-        var fngTask = SafeAsync(() => _alternativeMe.GetLatestAsync(cancellationToken));
+        var globalTask = CaptureAsync(() => _coinGecko.GetGlobalStatsAsync(cancellationToken));
+        var fngTask = CaptureAsync(() => _alternativeMe.GetLatestAsync(cancellationToken));
         await Task.WhenAll(globalTask, fngTask);
+
+        var globalResult = globalTask.Result;
+        var fngResult = fngTask.Result;
+        if (globalResult.Error != null && fngResult.Error != null)
+        {
+            throw new FriendlyException(
+                "虚拟币市场指标数据源均不可用",
+                new AggregateException(globalResult.Error, fngResult.Error));
+        }
 
         var items = new List<IndexQuoteItem>(3);
 
-        if (globalTask.Result is { } global)
+        if (globalResult.Value is { } global)
         {
             // 全网总市值 + 24h 涨跌幅
             items.Add(new IndexQuoteItem(
@@ -35,7 +45,7 @@ public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, Alter
             items.Add(new IndexQuoteItem("BTC主导率", $"{global.BtcDominancePct:F1}%", null, TickerTrend.None));
         }
 
-        if (fngTask.Result is { } fng)
+        if (fngResult.Value is { } fng)
         {
             // 恐惧贪婪指数：数值 + 中文分类，无涨跌语义
             items.Add(new IndexQuoteItem("恐惧贪婪", fng.Value.ToString(), TranslateFng(fng.Classification), TickerTrend.None));
@@ -44,20 +54,20 @@ public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, Alter
         return items;
     }
 
-    /// <summary>吞掉单个数据源异常，返回 null，保证一个源失败不影响其余项。</summary>
-    private static async Task<T?> SafeAsync<T>(Func<Task<T?>> action) where T : struct
+    /// <summary>保留单源故障信息，使单源可降级、全源可识别；取消始终向外传播。</summary>
+    private static async Task<(T? Value, Exception? Error)> CaptureAsync<T>(Func<Task<T?>> action) where T : struct
     {
         try
         {
-            return await action();
+            return (await action(), null);
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            return (null, ex);
         }
     }
 

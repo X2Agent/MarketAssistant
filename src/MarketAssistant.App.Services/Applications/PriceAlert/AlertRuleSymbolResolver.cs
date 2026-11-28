@@ -31,8 +31,8 @@ public sealed class AlertRuleSymbolResolver : IDisposable
         IServiceProvider serviceProvider,
         ILogger<AlertRuleSymbolResolver> logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _serviceProvider = serviceProvider;
+        _logger = logger;
         WeakReferenceMessenger.Default.Register<AssetFavoritesChanged>(this, (_, _) => InvalidateCache());
     }
 
@@ -40,8 +40,6 @@ public sealed class AlertRuleSymbolResolver : IDisposable
     public async Task<IReadOnlyList<string>> ResolveSymbolsAsync(
         PriceAlertRule rule, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(rule);
-
         if (rule.Scope != AlertScope.Watchlist)
         {
             return string.IsNullOrWhiteSpace(rule.AssetCode)
@@ -59,8 +57,6 @@ public sealed class AlertRuleSymbolResolver : IDisposable
     public async Task<IReadOnlyList<string>> ResolveAllSymbolsAsync(
         MarketType marketType, IEnumerable<PriceAlertRule> rules, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(rules);
-
         var symbols = new List<string>();
         foreach (var rule in rules.Where(r => r.MarketType == marketType && r.Enabled))
         {

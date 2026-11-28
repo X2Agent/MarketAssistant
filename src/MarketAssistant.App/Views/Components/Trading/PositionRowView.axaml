@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converters="using:MarketAssistant.Converters"
+             xmlns:models="using:MarketAssistant.Trading.Models"
+             mc:Ignorable="d" d:DesignWidth="600"
+             x:Class="MarketAssistant.Views.Components.Trading.PositionRowView"
+             x:DataType="models:PositionInfo">
+
+    <!-- 持仓行：实时监控页与余额详情页共用。
+         数据源为交易所持仓快照（PositionInfo），方向由 IsShort 表达、数量为绝对值。 -->
+    <UserControl.Resources>
+        <converters:PriceChangeColorConverter x:Key="PnlColorConverter"/>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource SurfaceVariantBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            CornerRadius="{StaticResource TinyCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource TinyBottomMargin}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+
+            <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                <!-- 标识：符号 + 多空方向（红多绿空，与涨跌配色一致）+ 杠杆倍数 -->
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                    <TextBlock Text="{Binding Symbol}"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightTitle}"
+                               VerticalAlignment="Center"/>
+                    <controls:StatusTag Text="多" Classes="bullish" IsVisible="{Binding !IsShort}"/>
+                    <controls:StatusTag Text="空" Classes="bearish" IsVisible="{Binding IsShort}"/>
+                    <!-- 杠杆：现货（0）自动隐藏，不展示无意义的 0x -->
+                    <TextBlock Classes="num-sm"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsLeveraged}"
+                               Text="{Binding Leverage, StringFormat='{}{0:F0}x'}"/>
+                </StackPanel>
+
+                <!-- 明细：数量 / 开仓价 / 现价（合约为标记价）/ 强平价。强平价为 0 时隐藏 -->
+                <WrapPanel Classes="meta">
+                    <TextBlock>
+                        <Run Text="数量 "/><Run Text="{Binding Quantity, StringFormat={}{0:0.########}}"/>
+                    </TextBlock>
+                    <TextBlock>
+                        <Run Text=" · 开仓 "/><Run Text="{Binding EntryPrice, Converter={StaticResource PriceTextConverter}}"/>
+                    </TextBlock>
+                    <TextBlock>
+                        <Run Text=" · "/><Run Text="{Binding CurrentPriceLabel}"/><Run Text=" "/><Run Text="{Binding CurrentPrice, Converter={StaticResource PriceTextConverter}}"/>
+                    </TextBlock>
+                    <TextBlock IsVisible="{Binding HasLiquidationPrice}">
+                        <Run Text=" · 强平 "/><Run Text="{Binding LiquidationPrice, Converter={StaticResource PriceTextConverter}}"/>
+                    </TextBlock>
+                </WrapPanel>
+            </StackPanel>
+
+            <!-- 未实现盈亏（百分比为含杠杆 ROE） -->
+            <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}"
+                        VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock Classes="num"
+                           HorizontalAlignment="Right"
+                           Foreground="{Binding UnrealizedPnl, Converter={StaticResource PnlColorConverter}}"
+                           Text="{Binding UnrealizedPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"/>
+                <TextBlock Classes="num-sm"
+                           HorizontalAlignment="Right"
+                           Foreground="{Binding UnrealizedPnlPercent, Converter={StaticResource PnlColorConverter}}"
+                           Text="{Binding UnrealizedPnlPercent, StringFormat={}{0:+0.00;-0.00;0.00}%}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -84,15 +84,14 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
     /// <summary>五档：买一~买五 / 卖一~卖五 各为「量,价」成对字段。</summary>
     private const int Depth = 5;
 
-    private readonly IHttpClientFactory _httpClientFactory =
-        httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 拉取单只个股的五档盘口与逐笔成交。
     /// </summary>
     /// <param name="sinaCode">新浪格式代码（如 <c>sh600519</c>、<c>sz000001</c>）。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>解析成功且通过校验时返回结果；代码非法、响应异常或校验不通过时返回 <c>null</c>。</returns>
+    /// <returns>代码合法且解析、交叉校验通过时返回结果；无数据或校验不通过返回 <c>null</c>，请求故障向外抛出。</returns>
     public async Task<SinaStockQuote?> GetStockQuoteAsync(string sinaCode, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sinaCode) || !IsSupportedCode(sinaCode))
@@ -100,22 +99,10 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
             return null;
         }
 
-        try
-        {
-            var text = await SinaHqText.GetTextAsync(
-                _httpClientFactory, "SinaHq", $"/list={sinaCode}", cancellationToken);
+        var text = await SinaHqText.GetTextAsync(
+            _httpClientFactory, "SinaHq", $"/list={sinaCode}", cancellationToken);
 
-            return ParseResponse(text);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // 数据源抖动不应冒泡到 UI：调用方按"无数据"降级即可
-            return null;
-        }
+        return ParseResponse(text);
     }
 
     /// <summary>仅接受沪深京三市的新浪个股代码前缀，拒绝指数（s_/z_）等其它形态。</summary>

@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Infrastructure.Core;
 
@@ -26,7 +25,10 @@ public static class LlmJsonExtractor
     /// <typeparam name="T">目标类型</typeparam>
     /// <param name="rawText">LLM 返回的原始文本</param>
     /// <param name="options">JSON 序列化选项，为 null 时使用默认 Web 选项</param>
-    /// <returns>反序列化后的对象</returns>
+    /// <returns>
+    /// 反序列化后的对象。仅当 <paramref name="rawText"/> 为 null/空白时返回 null（引用类型的 default）；
+    /// 存在内容但所有解析策略均失败时抛出 <see cref="JsonException"/>，不以 null 表达失败。
+    /// </returns>
     /// <exception cref="JsonException">所有兜底策略均失败时抛出，包含原始文本预览与内部异常</exception>
     public static T? Deserialize<T>(string? rawText, JsonSerializerOptions? options = null)
     {
@@ -34,12 +36,11 @@ public static class LlmJsonExtractor
             return default;
 
         var jsonOptions = options ?? JsonSerializerOptions.Web;
-        Exception? lastException = null;
 
         // 第一层：直接解析（最理想情况，LLM 严格遵守了 JSON Schema 输出）
         if (TryDeserialize<T>(rawText, jsonOptions, out var result1, out var ex1))
             return result1;
-        lastException = ex1;
+        var lastException = ex1;
 
         // 第二层：剥离 markdown 代码块（```json ... ``` 或 ``` ... ```）
         var stripped = StripMarkdownCodeFence(rawText);

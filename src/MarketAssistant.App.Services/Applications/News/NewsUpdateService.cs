@@ -102,7 +102,9 @@ public class NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpd
 
             NewsUpdated?.Invoke(this, news);
         }
-        catch (OperationCanceledException)
+        // 仅当取消来自本循环的令牌时才上抛；HttpClient 超时同样抛 OperationCanceledException，
+        // 若一并上抛会让外层把它当成正常停止而静默退出整个轮询循环
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }

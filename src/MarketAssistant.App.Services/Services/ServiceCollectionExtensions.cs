@@ -2,37 +2,21 @@ using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.TokenManagement;
-using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.AlertCenter.Channels;
 using MarketAssistant.Applications.Analysis;
 using MarketAssistant.Applications.Briefing;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
-using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Agents.MarketAnalysis;
-using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.Tools;
-using MarketAssistant.Agents.Tools.Abstractions;
-using MarketAssistant.Agents.Tools.AShare;
-using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Applications.Assets;
-using MarketAssistant.Applications.AssetScreener;
-using MarketAssistant.Applications.AssetScreener.Models;
-using MarketAssistant.Applications.Cache;
-using MarketAssistant.Applications.Charts;
-using MarketAssistant.Applications.Favorites;
-using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Crypto;
-using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.InvestmentSelection;
-using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Http;
-using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
@@ -52,8 +36,7 @@ using System.Net;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.VectorData;
-using Polly.RateLimiting;
+using Polly;
 using Serilog;
 using System.Threading.RateLimiting;
 
@@ -80,7 +63,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTradingServices();
         services.AddWorkflowServices();
         services.AddMarketModules();
-        services.AddSingleton<IReleaseService, GitHubReleaseService>();
+        services.AddSingleton<GitHubReleaseService>();
         services.AddSingleton<Agents.MarketAnalysis.Artifacts.IAnalystArtifactStore>(_ => new Agents.MarketAnalysis.Artifacts.FileAnalystArtifactStore(
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -109,6 +92,17 @@ public static class BusinessServiceCollectionExtensions
         {
             // 币安 REST API 限流：IP 维度 6000 weight/min，单连接并发过高易触发 429。
             // 桌面端场景下限制并发请求数即可，配合标准重试/熔断策略。
+            ConfigureBinanceRateLimiter(options);
+        });
+
+        // 现货公共行情只读主机：与 api.binance.com 的行情响应一致，但不受地区限制（后者在部分出口 IP 返回 451）。
+        // 签名交易、账户与时间同步仍走上面的 Binance 客户端。
+        services.AddHttpClient("BinanceMarketData", client =>
+        {
+            client.BaseAddress = new Uri("https://data-api.binance.vision");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).AddStandardResilienceHandler(options =>
+        {
             ConfigureBinanceRateLimiter(options);
         });
 
@@ -157,12 +151,20 @@ public static class BusinessServiceCollectionExtensions
         services.AddHttpClient("ZhiTu", client =>
         {
             client.BaseAddress = new Uri("https://api.zhituapi.com");
-            client.Timeout = TimeSpan.FromSeconds(60);
+            client.Timeout = TimeSpan.FromSeconds(25);
         }).AddStandardResilienceHandler(options =>
         {
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+            // 智兔对不覆盖的标的返回 503（"redis history miss"）与 404 语义相同——是「没有数据」而非瞬时抖动。
+            // 默认 3 次指数退避（1s/3s/7s）会把一次确定失败放大成 15 秒等待，故只重试 1 次且用固定短退避：
+            // 真实网络抖动仍有一次补救，确定失败约 1.3 秒内交给兜底数据源（新浪）。
+            options.Retry.MaxRetryAttempts = 1;
+            options.Retry.BackoffType = DelayBackoffType.Constant;
+            options.Retry.UseJitter = false;
+            options.Retry.Delay = TimeSpan.FromMilliseconds(500);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
+            // 总超时必须覆盖一次完整尝试 + 退避 + 重试尝试
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(25);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(25);
         });
 
         services.AddHttpClient("Cls", client =>
@@ -261,10 +263,10 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
-        // 虚拟币快讯接口（PANews）
+        // 虚拟币快讯接口（Odaily，唯一来源）
         services.AddHttpClient("CryptoTelegram", client =>
         {
-            client.BaseAddress = new Uri("https://universal-api.panewslab.com");
+            client.BaseAddress = new Uri("https://api.odaily.news");
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
@@ -300,6 +302,15 @@ public static class BusinessServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
         });
 
+        services.AddHttpClient("Ollama", client => client.Timeout = TimeSpan.FromMinutes(3))
+            .AddResilienceHandler("retry", pipeline => pipeline.AddRetry(new HttpRetryStrategyOptions
+            {
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(1),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true
+            }));
+
         // OpenAI SDK 已提供请求重试；此客户端只负责匿名传输，避免叠加 HttpClient resilience 重试。
         services.AddHttpClient("AnonymousOpenAI", client =>
         {
@@ -317,6 +328,7 @@ public static class BusinessServiceCollectionExtensions
     /// </summary>
     private static void ConfigureBinanceRateLimiter(HttpStandardResilienceOptions options)
     {
+        options.Retry.DisableForUnsafeHttpMethods();
         var limiter = new ConcurrencyLimiter(new ConcurrencyLimiterOptions
         {
             PermitLimit = 10,
@@ -356,7 +368,6 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
         services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
-        services.AddSingleton<Infrastructure.Providers.IRagInfrastructureProvider, Infrastructure.Providers.RagInfrastructureProvider>();
         services.AddSingleton<Infrastructure.Providers.DocumentVectorizationService>();
         services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
@@ -487,6 +498,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
         services.AddSingleton<ExchangeConditionOrderService>();
+        // 持仓对账：以交易所为真相校准本地 FIFO 账本（外部成交/漏单造成的漂移）
+        services.AddSingleton<PositionReconciliationService>();
         services.AddSingleton<EmergencyStopService>();
         services.AddSingleton<LiquidationRiskEvaluator>();
         // 策略限价单超时撤单（自启动周期扫描）
@@ -510,7 +523,6 @@ public static class BusinessServiceCollectionExtensions
         // 避免 Singleton Executor 在并发分析间共享可变状态和模型引用。
         services.AddTransient<ScreenInvestmentTargetsExecutor>();
         services.AddTransient<AnalyzeAssetsExecutor>();
-        services.AddSingleton<IInvestmentExecutorFactory, InvestmentExecutorFactory>();
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 

@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Services.Trading;
@@ -22,7 +21,8 @@ public class TradingStrategyService(TradingDataService dataService)
         CancellationToken ct = default)
         => _dataService.GetStrategiesByStatusAsync(status, ct);
 
-    public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
+    /// <remarks>virtual 供策略创建表单单元测试替换。</remarks>
+    public virtual async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(strategy.Symbol))
         {
@@ -43,7 +43,8 @@ public class TradingStrategyService(TradingDataService dataService)
         RaiseStrategiesChanged();
     }
 
-    public async Task DeleteStrategyAsync(string strategyId, CancellationToken ct = default)
+    /// <remarks>virtual 供策略配置页单元测试替换（确认框取消后不得触达删除）。</remarks>
+    public virtual async Task DeleteStrategyAsync(string strategyId, CancellationToken ct = default)
     {
         await _dataService.DeleteStrategyAsync(strategyId, ct).ConfigureAwait(false);
         RaiseStrategiesChanged();

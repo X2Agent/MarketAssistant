@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -18,13 +19,13 @@ public sealed class AShareTechnicalTools(
     IUserSettingService userSettingService,
     ILogger<AShareTechnicalTools> logger) : ITechnicalDataTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient;
+    private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly ILogger<AShareTechnicalTools> _logger = logger;
 
-    private async Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol, CancellationToken cancellationToken = default)
+    private Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol, CancellationToken cancellationToken = default)
     {
-        try
+        return ToolExecutor.ExecuteAsync($"获取技术指标 {indicator.ToUpperInvariant()}", assetSymbol, _logger, async _ =>
         {
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
             var formattedSymbol = StockSymbolConverter.ToZhiTuFormat(assetSymbol);
@@ -34,12 +35,7 @@ public sealed class AShareTechnicalTools(
                 throw new FriendlyException($"获取 {indicator.ToUpperInvariant()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
 
             return items.Last();
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取技术指标失败: {Indicator} {Symbol}", indicator, assetSymbol);
-            throw new FriendlyException($"获取技术指标 {indicator} 时发生错误: {ex.Message} (代码: {assetSymbol})", ex);
-        }
+        }, cancellationToken);
     }
 
     [Description("获取近30日最新日线KDJ")]
@@ -65,7 +61,7 @@ public sealed class AShareTechnicalTools(
         [Description("返回根数，最大250")] int count = 30,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync<List<OhlcvBar>>("获取K线序列", assetSymbol, _logger, async _ =>
         {
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
             var formattedSymbol = StockSymbolConverter.ToZhiTuFormat(assetSymbol);
@@ -101,18 +97,13 @@ public sealed class AShareTechnicalTools(
                 .Select(x => new OhlcvBar
                 {
                     T = x.T,
-                    O = x.O!.Value,
-                    H = x.H!.Value,
-                    L = x.L!.Value,
-                    C = x.C!.Value,
+                    O = x.O.GetValueOrDefault(),
+                    H = x.H.GetValueOrDefault(),
+                    L = x.L.GetValueOrDefault(),
+                    C = x.C.GetValueOrDefault(),
                     V = x.V ?? 0m
                 })];
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取K线序列失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"获取K线序列失败: {ex.Message} (代码: {assetSymbol})", ex);
-        }
+        }, cancellationToken);
     }
 
     public IEnumerable<AIFunction> GetFunctions()

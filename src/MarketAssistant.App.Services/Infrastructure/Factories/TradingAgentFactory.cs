@@ -1,8 +1,6 @@
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Trading;
-using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Infrastructure.Factories;
@@ -16,7 +14,7 @@ public interface ITradingAgentFactory
 }
 
 /// <summary>
-/// 交易 Agent 工厂实现。<see cref="MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
+/// 交易 Agent 工厂实现。<see cref="MarketAssistant.Services.Market.MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
 /// 自主交易与工具解析<strong>始终</strong>使用 <see cref="MarketType.Crypto"/> 的 Keyed 注册（现货 Binance），与当前所选市场无关。
 /// </summary>
 public class TradingAgentFactory(
@@ -32,22 +30,14 @@ public class TradingAgentFactory(
     /// </summary>
     public AIAgent CreateAutomationAgent()
     {
-        try
-        {
-            var chatClient = _chatClientFactory.CreateClient();
-            var tools = ResolveToolsFor(typeof(TradingAgent), MarketType.Crypto);
+        var chatClient = _chatClientFactory.CreateClient();
+        var tools = ResolveToolsFor(typeof(TradingAgent), MarketType.Crypto);
 
-            var agent = (AIAgent)ActivatorUtilities.CreateInstance(
-                ServiceProvider, typeof(TradingAgent), chatClient, tools);
+        var agent = (AIAgent)ActivatorUtilities.CreateInstance(
+            ServiceProvider, typeof(TradingAgent), chatClient, tools);
 
-            Logger.LogInformation("成功创建自动交易 Agent（工具执行由 TradeExecutor 统一风控）");
-            return WrapWithTokenTracking(agent);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "创建 TradingAgent 失败");
-            throw;
-        }
+        Logger.LogInformation("成功创建自动交易 Agent（只读工具；下单由 TradeExecutor 统一风控执行）");
+        return WrapWithTokenTracking(agent);
     }
 
     /// <inheritdoc />

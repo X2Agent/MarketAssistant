@@ -17,434 +17,626 @@
     </Design.DataContext>
 
     <UserControl.Resources>
-        <converts:NullableValueConverter x:Key="NullableValueConverter"/>
-        <converts:NullableVisibilityConverter x:Key="NullableVisibilityConverter"/>
+        <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
-    <!-- 快捷策略/推荐卡片等局部样式（对齐原型 q-card / rst-card） -->
+    <!-- 快捷策略卡 / 风险标签 / 理由正文等局部样式
+         v3：无边框。hover 只加深表面色阶，选中态用 AccentRing 阴影环，
+         不能再用 BorderBrush 换色——DefaultBorderThickness 已归零，换色不可见。 -->
     <UserControl.Styles>
         <Style Selector="Border.q-card">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
             <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
             <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                    <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.q-card:pointerover">
-            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         </Style>
-        <Style Selector="Border.rst-card">
-            <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
-            <Setter Property="CornerRadius" Value="{StaticResource MediumCornerRadius}"/>
-            <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Style Selector="Border.q-card:focus-visible">
+            <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
         </Style>
-        <Style Selector="Border.score-badge">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-            <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-            <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+
+        <!-- AI 理由：默认三行，展开后不限行数（MaxLines=0 即不限） -->
+        <Style Selector="TextBlock.reason">
+            <Setter Property="MaxLines" Value="3"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
-        <Style Selector="Border.meta-pill">
-            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
-            <Setter Property="Padding" Value="{StaticResource TinyPadding}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style Selector="TextBlock.reason.expanded">
+            <Setter Property="MaxLines" Value="0"/>
+        </Style>
+
+        <!-- 推荐卡与风险提示里的文字覆写：必须用类样式。DataTemplate 里元素上本地写的 DynamicResource
+             优先级低于 body-sm / caption / num 这类排版类（它们都会设字重和前景色），写在元素上不生效。 -->
+        <!-- 略强调：名称与价格指标 -->
+        <Style Selector="TextBlock.rec-emphasis">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+        </Style>
+        <!-- 现价旁的涨跌幅：数字字重（颜色由绑定给出） -->
+        <Style Selector="TextBlock.rec-change">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightNumber}"/>
+        </Style>
+        <!-- 风险提示逐条文字：跟随警告面板的文字色 -->
+        <Style Selector="TextBlock.risk-warning-text">
+            <Setter Property="Foreground" Value="{DynamicResource WarningPanelTextBrush}"/>
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <!-- 加载指示器（覆盖层） -->
-        <Border Grid.Row="0" Grid.RowSpan="2"
-                Background="{DynamicResource DarkOverlayBrush}"
-                IsVisible="{Binding IsBusy}"
-                ZIndex="1000">
-            <Border Background="{DynamicResource CardBackgroundBrush}"
-                    CornerRadius="{StaticResource DefaultCornerRadius}"
-                    Padding="{StaticResource ProgressDialogPadding}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    MinWidth="{StaticResource InputAreaMinWidth}"
-                    MaxWidth="{StaticResource InputAreaMaxWidth}"
-                    BoxShadow="{StaticResource ElevatedBoxShadow}">
-                <StackPanel Spacing="{StaticResource LargeSpacing}">
-                    <controls:LoadingDots/>
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="正在分析中"
-                                   FontSize="{StaticResource LargeFontSize}"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding LoadingText}"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Center"
-                                   MaxWidth="{StaticResource MessageMaxWidth}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Border>
-
-        <ScrollViewer Grid.Row="1" IsVisible="{Binding !IsInitialLoading}">
+    <!-- 根用 Panel 叠放：两个 ScrollViewer（内容 / 骨架）互斥显示。
+         内容区内部再分输入态 / 运行态 / 结果态三段，三段互斥，运行态不再用整页遮罩盖住输入区。 -->
+    <Panel Background="{DynamicResource PageBackgroundBrush}">
+        <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
-                <!-- 页面标题已在顶栏显示，页面内不再重复 -->
 
-                <!-- 选币模式：等宽三卡（图标 + 名称 + 描述，对齐原型 mode-card） -->
-                <ItemsControl ItemsSource="{Binding SelectionModes}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="3"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:SelectionModeItem">
-                            <Border Classes.mode-card="True"
-                                    Classes.selected="{Binding IsSelected}"
-                                    Margin="{StaticResource TinyRightMargin}"
-                                    Focusable="True"
-                                    KeyDown="OnCardKeyDown"
-                                    AutomationProperties.Name="{Binding Name}">
-                                <StackPanel Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
-                                    <svg:Svg Path="{Binding IconPath}"
-                                             Width="{StaticResource DefaultIconSize}"
-                                             Height="{StaticResource DefaultIconSize}"
-                                             HorizontalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Name}"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               FontWeight="SemiBold"
-                                               Classes="mode-name"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Description}"
-                                               FontSize="{StaticResource MiniFontSize}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               TextWrapping="Wrap"
-                                               TextAlignment="Center"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- ============================ 输入态 ============================ -->
+                <StackPanel Spacing="{StaticResource LargeSpacing}" IsVisible="{Binding IsComposing}">
+                    <!-- 失败条：取消与失败都回到输入态，失败就地显示并给重试入口，不弹全局模态框 -->
+                    <controls:StatusBanner Severity="Danger"
+                                           Message="{Binding FailureMessage}"
+                                           IsVisible="{Binding HasFailure}">
+                        <Button Content="重试"
+                                Classes="btn-secondary btn-sm"
+                                Command="{Binding RetrySelectionCommand}"/>
+                    </controls:StatusBanner>
 
-                <!-- 验证提示消息 -->
-                <Border Background="{DynamicResource WarningPanelBackgroundBrush}"
-                        BorderBrush="{DynamicResource WarningPanelBorderBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
-                        CornerRadius="{StaticResource CardCornerRadius}"
-                        Padding="{StaticResource DefaultCardPadding}"
-                        IsVisible="{Binding HasValidationMessage}">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="ℹ️"
-                                   FontSize="{StaticResource SectionTitleFontSize}"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding ValidationMessage}"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource WarningPanelTextBrush}"
-                                   TextWrapping="Wrap"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- 需求输入区：输入框在上，操作按钮在下 -->
-                <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsInputAreaVisible}">
-                    <TextBox Text="{Binding CurrentInputContent}"
-                             PlaceholderText="{Binding CurrentPlaceholder}"
-                             Height="64"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"/>
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" HorizontalAlignment="Right">
-                        <Button Content="{Binding CurrentButtonText}"
-                                Command="{Binding ExecuteAnalysisCommand}"
-                                IsEnabled="{Binding !IsBusy}"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="{StaticResource TextOnEmphasisBrush}"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
-                        <Button Content="清除"
-                                Command="{Binding ClearContentCommand}"
-                                MinWidth="{StaticResource SmallButtonMinWidth}"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- 快捷策略（对齐原型 quick-grid 宫格，点击直接执行；仅快速策略模式显示） -->
-                <StackPanel Spacing="{StaticResource SmallSpacing}"
-                            IsVisible="{Binding IsQuickStrategyAreaVisible}">
-                    <TextBlock Text="{Binding QuickStrategyTitle}"
-                               FontSize="{StaticResource LabelFontSize}"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <ItemsControl ItemsSource="{Binding QuickStrategies}">
+                    <!-- 选币模式：等宽三卡（图标 + 名称 + 描述，对齐原型 mode-card） -->
+                    <ItemsControl ItemsSource="{Binding SelectionModes}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Columns="2"/>
+                                <UniformGrid Columns="3"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="models:QuickSelectionStrategyInfo">
-                                <Border Classes="q-card"
-                                        Margin="{StaticResource SmallCardGridMargin}"
+                            <DataTemplate x:DataType="vm:SelectionModeItem">
+                                <Border Classes="mode-card"
+                                        Classes.selected="{Binding IsSelected}"
+                                        Margin="{StaticResource TinyMargin}"
                                         Focusable="True"
-                                        KeyDown="OnCardKeyDown"
+                                        controls:Activation.Command="{Binding $parent[UserControl].((vm:AssetSelectionPageViewModel)DataContext).SelectModeCommand}"
+                                        controls:Activation.CommandParameter="{Binding}"
                                         AutomationProperties.Name="{Binding Name}">
-                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SmallSpacing}">
-                                        <!-- 图标：左侧垂直居中 -->
-                                        <Border Grid.Column="0"
-                                                Width="30"
-                                                Height="30"
-                                                CornerRadius="{StaticResource SmallCornerRadius}"
-                                                Background="{DynamicResource SurfaceVariantBrush}"
-                                                VerticalAlignment="Center">
-                                            <svg:Svg Path="{Binding IconPath}"
-                                                     Width="{StaticResource TinyIconSize}"
-                                                     Height="{StaticResource TinyIconSize}"
-                                                     HorizontalAlignment="Center"
-                                                     VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}"
-                                                       FontSize="{StaticResource LabelFontSize}"
-                                                       FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Description}"
-                                                       FontSize="{StaticResource SmallFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-                <!-- 选币结果（对齐原型 aiResults） -->
-                <StackPanel Spacing="{StaticResource LargeSpacing}" IsVisible="{Binding HasResult}">
-                    <!-- 摘要行：匹配数量 · 置信度 + 进度条 + 清除 -->
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <TextBlock Text="匹配"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding RecommendedStocks.Count}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource PrimaryBrush}"/>
-                            <TextBlock Text="只标的 · AI 置信度"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding SelectionResult.ConfidenceScore, StringFormat={}{0:F0}%}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource PrimaryBrush}"/>
-                        </StackPanel>
-                        <ProgressBar Grid.Column="1"
-                                     Value="{Binding SelectionResult.ConfidenceScore}"
-                                     Maximum="100"
-                                     Height="6"
-                                     Margin="{StaticResource HorizontalMargin}"
-                                     CornerRadius="{StaticResource TinyCornerRadius}"
-                                     VerticalAlignment="Center"/>
-                        <Button Grid.Column="2"
-                                Content="清除"
-                                Command="{Binding ClearContentCommand}"
-                                MinWidth="{StaticResource SmallButtonMinWidth}"/>
-                    </Grid>
-
-                    <!-- 推荐列表（对齐原型 rst-card） -->
-                    <ItemsControl ItemsSource="{Binding RecommendedStocks}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Spacing="{StaticResource DefaultSpacing}"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="models:InvestmentRecommendation">
-                                <Border Classes="rst-card">
-                                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                        <!-- 头部：名称/代码 | 评分徽标 -->
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
-                                                <TextBlock Text="{Binding Name}"
-                                                           FontSize="{StaticResource MediumFontSize}"
-                                                           FontWeight="Bold"/>
-                                                <TextBlock Text="{Binding Symbol}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource TinyFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </StackPanel>
-                                            <Border Grid.Column="1" Classes="score-badge">
-                                                <TextBlock Text="{Binding RecommendationScore, StringFormat={}{0:F0}}"
-                                                           FontSize="{StaticResource MediumFontSize}"
-                                                           FontWeight="Bold"
-                                                           Foreground="{StaticResource TextOnEmphasisBrush}"
-                                                           HorizontalAlignment="Center"/>
-                                            </Border>
-                                        </Grid>
-
-                                        <!-- 匹配理由 -->
-                                        <TextBlock Text="{Binding Reason}"
-                                                   FontSize="{StaticResource LabelFontSize}"
-                                                   LineHeight="{StaticResource CompactLineHeight}"
+                                    <StackPanel Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
+                                        <svg:Svg Path="{Binding IconPath}"
+                                                 Width="{StaticResource DefaultIconSize}"
+                                                 Height="{StaticResource DefaultIconSize}"
+                                                 HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="{StaticResource BodySmFontSize}"
+                                                   FontWeight="{DynamicResource WeightTitle}"
+                                                   Classes="mode-name"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Description}"
+                                                   FontSize="{StaticResource CaptionFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                                    TextWrapping="Wrap"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-
-                                        <!-- 关键指标：目标价 | 预期收益 | 止损价（对齐原型 rst-dcell） -->
-                                        <Grid ColumnDefinitions="*,*,*">
-                                            <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
-                                                <TextBlock Text="目标价"
-                                                           FontSize="{StaticResource MiniFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}|待定}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource BullishBrush}"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" Spacing="{StaticResource CompactSpacing}">
-                                                <TextBlock Text="预期收益"
-                                                           FontSize="{StaticResource MiniFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                <TextBlock Text="{Binding ExpectedReturn, Converter={StaticResource NullableValueConverter}, ConverterParameter=+{0:F1}%|待定}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource BullishBrush}"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2" Spacing="{StaticResource CompactSpacing}">
-                                                <TextBlock Text="止损价"
-                                                           FontSize="{StaticResource MiniFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                <TextBlock Text="{Binding StopLoss, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}|待定}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource BearishBrush}"/>
-                                            </StackPanel>
-                                        </Grid>
-
-                                        <!-- 底部：风险等级 / 持有期 / 仓位胶囊 -->
-                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                            <Border Classes="meta-pill">
-                                                <TextBlock Text="{Binding RiskLevel}"
-                                                           FontSize="{StaticResource MiniFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </Border>
-                                            <Border Classes="meta-pill"
-                                                    IsVisible="{Binding RecommendedHoldingPeriod, Converter={StaticResource NullableVisibilityConverter}}">
-                                                <TextBlock Text="{Binding RecommendedHoldingPeriod, StringFormat=建议持有 {0} 天}"
-                                                           FontSize="{StaticResource MiniFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </Border>
-                                            <Border Classes="meta-pill"
-                                                    IsVisible="{Binding RecommendedPosition, Converter={StaticResource NullableVisibilityConverter}}">
-                                                <TextBlock Text="{Binding RecommendedPosition, StringFormat=建议仓位 {0}%}"
-                                                           FontSize="{StaticResource MiniFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </Border>
-                                        </StackPanel>
+                                                   TextAlignment="Center"
+                                                   HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <!-- 分析摘要 -->
-                    <Border Background="{DynamicResource ItemBackgroundBrush}"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Padding="{StaticResource CardPadding}">
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="分析摘要"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="Bold"/>
-                            <TextBlock Text="{Binding SelectionResult.AnalysisSummary}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       TextWrapping="Wrap"
-                                       LineHeight="{StaticResource DefaultLineHeight}"/>
+
+                    <!-- 验证提示消息：语义底 + 语义字，无描边 -->
+                    <controls:StatusBanner Severity="Warning"
+                                           Message="{Binding ValidationMessage}"
+                                           IsVisible="{Binding HasValidationMessage}"/>
+
+                    <!-- 需求输入区：输入框在上，操作按钮在下 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsInputAreaVisible}">
+                        <TextBox Text="{Binding CurrentInputContent}"
+                                 PlaceholderText="{Binding CurrentPlaceholder}"
+                                 Height="64"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"/>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" HorizontalAlignment="Right">
+                            <Button Content="{Binding CurrentButtonText}"
+                                    Command="{Binding ExecuteAnalysisCommand}"
+                                    Classes="btn-primary"
+                                    MinWidth="{StaticResource MediumButtonMinWidth}"/>
+                            <Button Content="清除"
+                                    Command="{Binding ClearContentCommand}"
+                                    MinWidth="{StaticResource SmallButtonMinWidth}"/>
                         </StackPanel>
+                    </StackPanel>
+
+                    <!-- 快捷策略（对齐原型 quick-grid 宫格，点击直接执行；仅快速策略模式显示） -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                IsVisible="{Binding IsQuickStrategyAreaVisible}">
+                        <TextBlock Text="{Binding QuickStrategyTitle}"
+                                   FontSize="{StaticResource BodySmFontSize}"
+                                   FontWeight="{DynamicResource WeightTitle}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <ItemsControl ItemsSource="{Binding QuickStrategies}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="2"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:QuickSelectionStrategyInfo">
+                                    <Border Classes="q-card"
+                                            Margin="{StaticResource SmallCardGridMargin}"
+                                            Focusable="True"
+                                            controls:Activation.Command="{Binding $parent[UserControl].((vm:AssetSelectionPageViewModel)DataContext).ExecuteQuickSelectionCommand}"
+                                            controls:Activation.CommandParameter="{Binding}"
+                                            AutomationProperties.Name="{Binding Name}">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SmallSpacing}">
+                                            <!-- 图标：左侧垂直居中 -->
+                                            <Border Grid.Column="0"
+                                                    Width="30"
+                                                    Height="30"
+                                                    CornerRadius="{StaticResource SmallCornerRadius}"
+                                                    Background="{DynamicResource SurfaceVariantBrush}"
+                                                    VerticalAlignment="Center">
+                                                <svg:Svg Path="{Binding IconPath}"
+                                                         Width="{StaticResource TinyIconSize}"
+                                                         Height="{StaticResource TinyIconSize}"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"/>
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- ============================ 运行态 ============================ -->
+                <!-- 内联进度：需求条始终显示正在处理的内容，右侧是已用时与取消；
+                     三步对应工作流的真实阶段，状态点语言与 AI 分析页 ProgressDisplayView 一致。 -->
+                <StackPanel Spacing="{StaticResource LargeSpacing}" IsVisible="{Binding IsBusy}">
+                    <Border Background="{DynamicResource CardBackgroundBrush}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
+                            CornerRadius="{StaticResource CardCornerRadius}"
+                            Padding="{StaticResource DefaultCardPadding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding QueryDescription}"
+                                       Classes="body-sm"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ElapsedText}"
+                                       Classes="num"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <!-- 取消是次要操作，不用强调色（强调色此刻是进度本身） -->
+                            <Button Grid.Column="2"
+                                    Content="取消"
+                                    Classes="btn-secondary btn-sm"
+                                    Command="{Binding CancelSelectionCommand}"
+                                    VerticalAlignment="Center"/>
+                        </Grid>
                     </Border>
 
-                    <!-- 市场环境分析 -->
-                    <Border Background="{DynamicResource ItemBackgroundBrush}"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Padding="{StaticResource CardPadding}">
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="市场环境分析"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="Bold"/>
-                            <TextBlock Text="{Binding SelectionResult.MarketEnvironmentAnalysis}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       TextWrapping="Wrap"
-                                       LineHeight="{StaticResource DefaultLineHeight}"/>
+                    <controls:CardView Header="{Binding RunningTitle}">
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <ItemsControl ItemsSource="{Binding Steps}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="{StaticResource DefaultSpacing}"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SelectionStepItem">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+                                            <Grid Grid.Column="0"
+                                                  Width="{StaticResource IndicatorSize}"
+                                                  Height="{StaticResource IndicatorSize}"
+                                                  VerticalAlignment="Center">
+                                                <!-- 运行中：呼吸点 -->
+                                                <Ellipse Width="{StaticResource StatusDotSize}"
+                                                         Height="{StaticResource StatusDotSize}"
+                                                         Fill="{StaticResource AccentBrush}"
+                                                         Classes="PulseDot"
+                                                         IsVisible="{Binding IsRunning}"/>
+                                                <!-- 等待：静默灰点 -->
+                                                <Ellipse Width="{StaticResource StatusDotSize}"
+                                                         Height="{StaticResource StatusDotSize}"
+                                                         Fill="{DynamicResource TextSecondaryBrush}"
+                                                         Opacity="0.4"
+                                                         IsVisible="{Binding IsPending}"/>
+                                                <!-- 完成：绿点 -->
+                                                <Ellipse Width="{StaticResource StatusDotSize}"
+                                                         Height="{StaticResource StatusDotSize}"
+                                                         Fill="{DynamicResource SuccessBrush}"
+                                                         IsVisible="{Binding IsCompleted}"/>
+                                            </Grid>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Title}"
+                                                       Classes="body-sm"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding StatusText}"
+                                                       Classes="caption"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="离开本页会中断本次任务"
+                                       Classes="caption"/>
                         </StackPanel>
-                    </Border>
+                    </controls:CardView>
+                </StackPanel>
 
-                    <!-- 投资建议 -->
-                    <Border Background="{DynamicResource InfoPanelBackgroundBrush}"
-                            BorderBrush="{DynamicResource InfoPanelBorderBrush}"
-                            BorderThickness="{StaticResource ThickBorderThickness}"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Padding="{StaticResource CardPadding}">
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="投资建议"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource InfoPanelTextBrush}"/>
-                            <TextBlock Text="{Binding SelectionResult.InvestmentAdvice}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource InfoPanelTextBrush}"
-                                       TextWrapping="Wrap"
-                                       LineHeight="{StaticResource DefaultLineHeight}"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- 风险提示（对齐原型 warn-strip） -->
-                    <Border Background="{StaticResource WarningBackgroundAltBrush}"
-                            BorderBrush="{StaticResource WarningBorderAltBrush}"
-                            BorderThickness="{StaticResource ThickBorderThickness}"
-                            CornerRadius="{StaticResource CardCornerRadius}"
-                            Padding="{StaticResource CardPadding}"
-                            IsVisible="{Binding HasRiskWarnings}">
-                        <TextBlock Text="{Binding FormattedRiskWarnings}"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource WarningPanelTextBrush}"
+                <!-- ============================ 结果态 ============================ -->
+                <!-- 独占整个内容区、从页面顶部开始：需求摘要在结果头里，「新的选股」回到输入态并保留输入内容。 -->
+                <StackPanel Spacing="{StaticResource LargeSpacing}" IsVisible="{Binding HasResult}">
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <controls:PageHeaderView Title="{Binding ResultTitle}"
+                                                 Description="{Binding ResultSubtitle}">
+                            <Button Content="{Binding NewSelectionText}"
+                                    Classes="btn-secondary"
+                                    Command="{Binding NewSelectionCommand}"/>
+                        </controls:PageHeaderView>
+                        <!-- 已应用的筛选条件：让用户看到模型把需求译成了什么条件，结果为空或不符预期时先看这里。
+                             页头说明被设计成单行截断，条件文案较长，所以单独成行 -->
+                        <TextBlock Text="{Binding AppliedCriteriaText}"
+                                   Classes="caption"
                                    TextWrapping="Wrap"
-                                   LineHeight="{StaticResource DefaultLineHeight}"/>
-                    </Border>
+                                   IsVisible="{Binding HasAppliedCriteria}"/>
+                    </StackPanel>
 
+                    <!-- AI 研判：先看结论。置信度仅在有推荐时显示，
+                         0 推荐时是默认占位结果，置信度 0 会被误读成“AI 毫无把握” -->
+                    <controls:CardView>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="AI 研判" Classes="card-title"/>
+                            <Grid ColumnDefinitions="Auto,Auto,*"
+                                  ColumnSpacing="{StaticResource SmallSpacing}"
+                                  IsVisible="{Binding HasRecommendations}">
+                                <TextBlock Grid.Column="0" Text="置信度" Classes="caption" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding SelectionResult.ConfidenceScore, StringFormat={}{0:F0}}"
+                                           Classes="num"
+                                           FontWeight="{DynamicResource WeightNumber}"
+                                           VerticalAlignment="Center"/>
+                                <ProgressBar Grid.Column="2"
+                                             Value="{Binding SelectionResult.ConfidenceScore}"
+                                             Maximum="100"
+                                             Height="{StaticResource ProgressBarHeight}"
+                                             CornerRadius="{StaticResource TinyCornerRadius}"
+                                             Foreground="{StaticResource AccentBrush}"
+                                             Background="{DynamicResource SurfaceVariantBrush}"
+                                             VerticalAlignment="Center"/>
+                            </Grid>
+                            <TextBlock Text="{Binding SelectionResult.AnalysisSummary}"
+                                       Classes="body-sm"
+                                       TextWrapping="Wrap"/>
+                            <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding HasRecommendations}">
+                                <Button Content="{Binding EnvironmentToggleText}"
+                                        Classes="btn-ghost btn-sm"
+                                        Command="{Binding ToggleEnvironmentCommand}"
+                                        HorizontalAlignment="Left"/>
+                                <TextBlock Text="{Binding SelectionResult.MarketEnvironmentAnalysis}"
+                                           Classes="body-sm"
+                                           TextWrapping="Wrap"
+                                           IsVisible="{Binding IsEnvironmentExpanded}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 0 推荐：默认占位结果里的建议文案是通用占位，不渲染，只给说明与返回入口 -->
+                    <controls:CardView IsVisible="{Binding !HasRecommendations}">
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}" HorizontalAlignment="Center">
+                            <TextBlock Text="未筛出符合条件的标的"
+                                       Classes="card-title"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="可以放宽筛选条件，或换一种模式再试一次"
+                                       Classes="caption"
+                                       HorizontalAlignment="Center"/>
+                            <Button Content="返回修改条件"
+                                    Classes="btn-primary"
+                                    Command="{Binding NewSelectionCommand}"
+                                    HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 推荐列表：逐只比较、立即行动 -->
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}" IsVisible="{Binding HasRecommendations}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="{Binding RecommendationTitle}"
+                                       Classes="card-title"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding RecommendationCountText}"
+                                       Classes="caption"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <ItemsControl ItemsSource="{Binding Recommendations}" VerticalAlignment="Top">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <controls:AdaptiveUniformGrid MinColumnWidth="{StaticResource SelectionCardWidth}"
+                                                                  MaxColumns="2"
+                                                                  RowSpacing="{StaticResource LargeSpacing}"
+                                                                  ColumnSpacing="{StaticResource LargeSpacing}"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RecommendationItemViewModel">
+                                    <controls:CardView>
+                                        <!-- 操作行钉在卡片底部：同一行的两张卡高度被网格拉齐，操作行不会随理由长短上下错位 -->
+                                        <Grid RowDefinitions="Auto,Auto,*,Auto">
+                                            <!-- 头部：排名 名称 风险标签 / 代码 | 推荐度 -->
+                                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+                                                <Grid Grid.Column="0"
+                                                      RowDefinitions="Auto,Auto"
+                                                      ColumnDefinitions="Auto,*,Auto"
+                                                      ColumnSpacing="{StaticResource SmallSpacing}">
+                                                    <!-- 名次：次要色的数字（caption 自带次要色，num-sm 是主色，所以不用 num-sm） -->
+                                                    <TextBlock Grid.Row="0" Grid.Column="0"
+                                                               Text="{Binding RankText}"
+                                                               Classes="caption"
+                                                               FontFamily="{StaticResource DataFontFamily}"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Row="0" Grid.Column="1"
+                                                               Text="{Binding Name}"
+                                                               Classes="body-sm rec-emphasis"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               VerticalAlignment="Center"/>
+                                                    <!-- 风险等级：低 = 成功色、中 = 警告色、高 = 危险色，与 RiskLevel 三档一一对应 -->
+                                                    <controls:StatusTag Grid.Row="0" Grid.Column="2"
+                                                                        Text="{Binding RiskLevel, Converter={StaticResource EnumDescriptionConverter}}"
+                                                                        Classes.success="{Binding IsLowRisk}"
+                                                                        Classes.warning="{Binding IsMediumRisk}"
+                                                                        Classes.danger="{Binding IsHighRisk}"/>
+                                                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                                               Text="{Binding Symbol}"
+                                                               Classes="caption"/>
+                                                </Grid>
+                                                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding ScoreText}"
+                                                               Classes="num-lg"
+                                                               HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="推荐度"
+                                                               Classes="caption"
+                                                               HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- 正文：理由（默认三行）→ 四项指标 → 持有建议 -->
+                                            <StackPanel Grid.Row="1"
+                                                        Spacing="{StaticResource DefaultSpacing}"
+                                                        Margin="{StaticResource TopMargin}">
+                                                <StackPanel Spacing="{StaticResource TinySpacing}">
+                                                    <TextBlock Text="{Binding Reason}"
+                                                               Classes="body-sm reason"
+                                                               Classes.expanded="{Binding IsReasonExpanded}"/>
+                                                    <Button Content="{Binding ReasonToggleText}"
+                                                            Classes="btn-ghost btn-sm"
+                                                            Command="{Binding ToggleReasonCommand}"
+                                                            IsVisible="{Binding CanExpandReason}"
+                                                            HorizontalAlignment="Left"/>
+                                                </StackPanel>
+
+                                                <!-- 现价与当日涨跌来自筛选快照（涨跌挂在标签行，不增加行高）；
+                                                     目标价红、止损价绿（涨红跌绿）；空值显示破折号 -->
+                                                <Grid ColumnDefinitions="*,*,*,*">
+                                                    <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
+                                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                            <TextBlock Text="现价" Classes="caption"/>
+                                                            <TextBlock Text="{Binding ChangeText}"
+                                                                       Classes="caption rec-change"
+                                                                       FontFamily="{StaticResource DataFontFamily}"
+                                                                       Foreground="{Binding ChangeText, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding CurrentPriceText}"
+                                                                   Classes="num rec-emphasis"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Spacing="{StaticResource CompactSpacing}">
+                                                        <TextBlock Text="目标价" Classes="caption"/>
+                                                        <TextBlock Text="{Binding TargetPriceText}"
+                                                                   Classes="num rec-emphasis"
+                                                                   Foreground="{StaticResource BullishBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2" Spacing="{StaticResource CompactSpacing}">
+                                                        <TextBlock Text="止损价" Classes="caption"/>
+                                                        <TextBlock Text="{Binding StopLossText}"
+                                                                   Classes="num rec-emphasis"
+                                                                   Foreground="{StaticResource BearishBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="3" Spacing="{StaticResource CompactSpacing}">
+                                                        <TextBlock Text="预期收益" Classes="caption"/>
+                                                        <TextBlock Text="{Binding ExpectedReturnText}"
+                                                                   Classes="num rec-emphasis"
+                                                                   Foreground="{Binding ExpectedReturnText, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBlock Text="{Binding HoldingText}"
+                                                           Classes="caption"
+                                                           IsVisible="{Binding HasHoldingText}"/>
+                                            </StackPanel>
+
+                                            <!-- 操作行：查看详情 / AI 深度分析 | 收藏开关 -->
+                                            <Grid Grid.Row="3"
+                                                  ColumnDefinitions="Auto,Auto,*,Auto"
+                                                  ColumnSpacing="{StaticResource SmallSpacing}"
+                                                  Margin="{StaticResource TopMargin}">
+                                                <Button Grid.Column="0"
+                                                        Content="查看详情"
+                                                        Classes="btn-secondary btn-sm"
+                                                        Command="{Binding $parent[UserControl].((vm:AssetSelectionPageViewModel)DataContext).ViewRecommendationDetailCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Grid.Column="1"
+                                                        Content="AI 深度分析"
+                                                        Classes="btn-secondary btn-sm"
+                                                        Command="{Binding $parent[UserControl].((vm:AssetSelectionPageViewModel)DataContext).AnalyzeRecommendationCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Grid.Column="3"
+                                                        Classes="btn-icon-sm"
+                                                        ToolTip.Tip="{Binding FavoriteToolTip}"
+                                                        AutomationProperties.Name="{Binding FavoriteToolTip}"
+                                                        Command="{Binding $parent[UserControl].((vm:AssetSelectionPageViewModel)DataContext).ToggleFavoriteCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Panel>
+                                                        <svg:Svg Path="/Assets/Images/tab_favorites.svg"
+                                                                 Width="{StaticResource TinyIconSize}"
+                                                                 Height="{StaticResource TinyIconSize}"
+                                                                 IsVisible="{Binding !IsFavorite}"/>
+                                                        <svg:Svg Path="/Assets/Images/tab_favorites_on.svg"
+                                                                 Width="{StaticResource TinyIconSize}"
+                                                                 Height="{StaticResource TinyIconSize}"
+                                                                 IsVisible="{Binding IsFavorite}"/>
+                                                    </Panel>
+                                                </Button>
+                                            </Grid>
+                                        </Grid>
+                                    </controls:CardView>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- 投资建议与风险提示：宽窗并排，窄窗堆叠；0 推荐时隐藏（内容是默认占位文案） -->
+                    <controls:AdaptiveUniformGrid MinColumnWidth="{StaticResource SelectionCardWidth}"
+                                                  MaxColumns="2"
+                                                  RowSpacing="{StaticResource LargeSpacing}"
+                                                  ColumnSpacing="{StaticResource LargeSpacing}"
+                                                  VerticalAlignment="Top"
+                                                  IsVisible="{Binding HasRecommendations}">
+                        <!-- 投资建议：v3 语义面板只靠低透明度色块分层，不描边 -->
+                        <Border Background="{DynamicResource InfoPanelBackgroundBrush}"
+                                BorderThickness="{StaticResource NoBorderThickness}"
+                                CornerRadius="{StaticResource CardCornerRadius}"
+                                Padding="{StaticResource CardPadding}">
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Text="投资建议"
+                                           Classes="body-sm"
+                                           FontWeight="{DynamicResource WeightTitle}"
+                                           Foreground="{DynamicResource InfoPanelTextBrush}"/>
+                                <TextBlock Text="{Binding SelectionResult.InvestmentAdvice}"
+                                           Classes="body-sm"
+                                           Foreground="{DynamicResource InfoPanelTextBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 风险提示：逐条列表 -->
+                        <Border Background="{DynamicResource WarningBackgroundAltBrush}"
+                                BorderThickness="{StaticResource NoBorderThickness}"
+                                CornerRadius="{StaticResource CardCornerRadius}"
+                                Padding="{StaticResource CardPadding}"
+                                IsVisible="{Binding HasRiskWarnings}">
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Text="风险提示"
+                                           Classes="body-sm"
+                                           FontWeight="{DynamicResource WeightTitle}"
+                                           Foreground="{DynamicResource WarningPanelTextBrush}"/>
+                                <ItemsControl ItemsSource="{Binding SelectionResult.RiskWarnings}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="{StaticResource SmallSpacing}"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SmallSpacing}">
+                                                <Ellipse Grid.Column="0"
+                                                         Width="{StaticResource DotIconSize}"
+                                                         Height="{StaticResource DotIconSize}"
+                                                         Fill="{DynamicResource WarningPanelTextBrush}"
+                                                         VerticalAlignment="Top"
+                                                         Margin="{StaticResource SmallTopMargin}"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding .}"
+                                                           Classes="body-sm risk-warning-text"
+                                                           TextWrapping="Wrap"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </controls:AdaptiveUniformGrid>
+
+                    <TextBlock Text="数据来源网络，仅供参考。投资有风险，入市需谨慎！"
+                               Classes="caption"
+                               HorizontalAlignment="Center"
+                               IsVisible="{Binding HasRecommendations}"/>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
 
-        <!-- 首屏骨架：三模式卡 + 输入区 + 结果列表行 -->
-        <ScrollViewer Grid.Row="1"
-                      IsVisible="{Binding IsInitialLoading}"
-                      Background="{DynamicResource CardBackgroundBrush}">
+        <!-- 首屏骨架：三模式卡 + 输入区。
+             三张模式卡是 mode-card 的结构克隆（同 20 内边距、同
+             「图标 24 / 名称 21 / 描述 2 行 36」+ 4 间距）。
+             真实页面首屏只有输入态，不显示结果，所以骨架也不画结果行。 -->
+        <ScrollViewer IsVisible="{Binding IsInitialLoading}">
             <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
-                <UniformGrid Columns="3">
-                    <Border Classes="skeleton skeleton-card" Height="112" Margin="{StaticResource TinyRightMargin}"/>
-                    <Border Classes="skeleton skeleton-card" Height="112" Margin="{StaticResource TinyRightMargin}"/>
-                    <Border Classes="skeleton skeleton-card" Height="112"/>
-                </UniformGrid>
-                <Border Classes="skeleton skeleton-panel" Height="200"/>
+                <!-- 三模式卡：三列网格 + 图标占位 -->
+                <controls:SkeletonList Count="3">
+                    <controls:SkeletonList.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3"/>
+                        </ItemsPanelTemplate>
+                    </controls:SkeletonList.ItemsPanel>
+                    <controls:SkeletonList.ItemTemplate>
+                        <DataTemplate>
+                            <!-- 与真实 mode-card 对齐：白卡表面 + 20 内边距（Variant=Tile 默认是
+                                 次级表面 16 内边距，这里按真实卡片覆写） -->
+                            <controls:SkeletonCard Variant="Tile"
+                                                   Background="{DynamicResource CardBackgroundBrush}"
+                                                   Padding="{StaticResource CardPadding}"
+                                                   Margin="{StaticResource TinyMargin}"
+                                                   HorizontalContentAlignment="Center">
+                                <StackPanel Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
+                                    <Border Classes="skeleton"
+                                            Width="{StaticResource DefaultIconSize}"
+                                            Height="{StaticResource DefaultIconSize}"
+                                            CornerRadius="{StaticResource SmallCornerRadius}"/>
+                                    <controls:SkeletonLines Row="BodySm" LineWidths="72" Margin="0,4,0,0"/>
+                                    <controls:SkeletonLines Row="Caption" LineWidths="128,96" Spacing="0"/>
+                                </StackPanel>
+                            </controls:SkeletonCard>
+                        </DataTemplate>
+                    </controls:SkeletonList.ItemTemplate>
+                </controls:SkeletonList>
+
+                <!-- 输入区：占位高度与真实 TextBox(64) + 按钮行(36) + 8 间距一致 -->
                 <StackPanel Spacing="{StaticResource SmallSpacing}">
-                    <Border Classes="skeleton skeleton-row" Height="88"/>
-                    <Border Classes="skeleton skeleton-row" Height="88"/>
-                    <Border Classes="skeleton skeleton-row" Height="88"/>
+                    <Border Classes="skeleton"
+                            Height="64"
+                            CornerRadius="{StaticResource SmallCornerRadius}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}"
+                                HorizontalAlignment="Right">
+                        <Border Classes="skeleton" Width="{StaticResource MediumButtonMinWidth}"
+                                Height="{StaticResource ButtonHeight}"
+                                CornerRadius="{StaticResource SmallCornerRadius}"/>
+                        <Border Classes="skeleton" Width="{StaticResource SmallButtonMinWidth}"
+                                Height="{StaticResource ButtonHeight}"
+                                CornerRadius="{StaticResource SmallCornerRadius}"/>
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
 
-        <!-- 失败态（含重试入口）；空态由页面内各分区自行提示 -->
-        <controls:StateOverlayView Grid.Row="1"
-                                   State="{Binding OverlayState}"
+        <!-- 页面加载的失败态（含重试入口）；选股运行的失败走输入态顶部的失败条 -->
+        <controls:StateOverlayView State="{Binding OverlayState}"
                                    Message="{Binding OverlayMessage}"
                                    RetryCommand="{Binding RetryCommand}"
                                    RetryText="重新加载"
-                                   ShowLoading="False"
-                                   ZIndex="999"/>
-    </Grid>
+                                   ShowLoading="False"/>
+    </Panel>
 </UserControl>

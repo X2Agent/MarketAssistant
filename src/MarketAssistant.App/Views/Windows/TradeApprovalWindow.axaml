@@ -1,0 +1,109 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dialog="using:MarketAssistant.Services.Dialog"
+        xmlns:models="using:MarketAssistant.Trading.Models"
+        xmlns:controls="using:MarketAssistant.Views.Controls"
+        xmlns:converters="using:MarketAssistant.Converters"
+        x:Class="MarketAssistant.Views.Windows.TradeApprovalWindow"
+        x:DataType="dialog:TradeApprovalRequest"
+        Title="自动交易确认"
+        Width="{StaticResource DialogCardWidth}"
+        MinWidth="360"
+        MaxWidth="560"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PageBackgroundBrush}">
+
+    <Window.Resources>
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
+    </Window.Resources>
+
+    <!-- 自动交易的人审确认：这是真钱审批路径，窗口只负责把“订单落到哪、买卖什么、多大金额、还剩多久”
+         讲清楚。批准 / 拒绝的 fail-closed 语义（超时、关闭窗口、Esc 均视为拒绝）由 DialogService 与
+         TradeConfirmationService 保证，这里不改。居中卡片规范同 MessageDialogWindow。 -->
+    <Border Background="{DynamicResource CardBackgroundBrush}"
+            CornerRadius="{StaticResource CardCornerRadius}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            Padding="{StaticResource PagePadding}"
+            Margin="{StaticResource PagePaddingCompact}">
+        <StackPanel Spacing="{StaticResource LargeSpacing}">
+
+            <!-- 标题 + 交易环境：实盘用红色危险标签，测试网 / Demo 用警告色提示“虚拟资金” -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+                <TextBlock Grid.Column="0" Text="自动交易确认" Classes="card-title" VerticalAlignment="Center"/>
+                <controls:StatusTag Grid.Column="1"
+                                    Text="{Binding EnvironmentText}"
+                                    Classes.warning="{Binding IsTestnet}"
+                                    Classes.danger="{Binding !IsTestnet}"/>
+            </Grid>
+
+            <!-- 订单摘要：交易对 + 方向，再逐项列出价格 / 数量 / 名义金额 -->
+            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                    CornerRadius="{StaticResource SmallCornerRadius}"
+                    Padding="{StaticResource DefaultCardPadding}">
+                <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Text="{Binding Symbol}"
+                                   FontSize="{StaticResource BodyFontSize}"
+                                   FontWeight="{DynamicResource WeightTitle}"
+                                   VerticalAlignment="Center"/>
+                        <controls:StatusTag Text="{Binding Side, Converter={StaticResource EnumDescriptionConverter}}"
+                                            Classes.bullish="{Binding Side, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:OrderSide.Buy}}"
+                                            Classes.bearish="{Binding Side, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:OrderSide.Sell}}"/>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="Auto,*"
+                          RowDefinitions="Auto,Auto,Auto"
+                          ColumnSpacing="{StaticResource LargeSpacing}"
+                          RowSpacing="{StaticResource SmallSpacing}">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="参考价格" Classes="caption"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="num-sm" HorizontalAlignment="Right"
+                                   Text="{Binding Price, Converter={StaticResource PriceTextConverter}}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="数量" Classes="caption"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="num-sm" HorizontalAlignment="Right"
+                                   Text="{Binding Quantity, StringFormat={}{0:0.########}}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="名义金额" Classes="caption" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="num" HorizontalAlignment="Right"
+                                   FontWeight="{DynamicResource WeightNumber}"
+                                   Text="{Binding Notional, StringFormat='≈ {0:N2} USDT'}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 触发原因 -->
+            <StackPanel Spacing="{StaticResource TinySpacing}">
+                <TextBlock Text="触发原因" Classes="caption"/>
+                <TextBlock Text="{Binding Reason}" Classes="body-sm" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- 倒计时：数值由 code-behind 每秒刷新；超时自动拒绝由调用方的取消令牌驱动 -->
+            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                <ProgressBar Name="CountdownBar"
+                             Minimum="0"
+                             Height="{StaticResource ProgressBarHeight}"/>
+                <TextBlock Name="CountdownText" Classes="caption" HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- 批准是真实下单动作，不设默认键；拒绝绑定 Esc 并在打开后取得焦点，回车 / 空格默认落在安全侧 -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="{StaticResource SmallSpacing}">
+                <Button Content="批准"
+                        Classes="btn-primary"
+                        MinWidth="{StaticResource SmallButtonMinWidth}"
+                        Click="OnApproveClick"/>
+                <Button Name="RejectButton"
+                        Content="拒绝"
+                        Classes="btn-secondary"
+                        IsCancel="True"
+                        MinWidth="{StaticResource SmallButtonMinWidth}"
+                        Click="OnRejectClick"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

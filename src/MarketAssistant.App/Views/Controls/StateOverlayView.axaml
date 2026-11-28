@@ -30,47 +30,48 @@
                  Width="{Binding #Root.IconSize}"
                  Height="{Binding #Root.IconSize}"
                  HorizontalAlignment="Center"
+                 Opacity="0.85"
                  IsVisible="{Binding #Root.IsFailedState}"/>
 
         <!-- 失败标题 -->
         <TextBlock Text="{Binding #Root.TitleText}"
-                   FontSize="{StaticResource SectionTitleFontSize}"
-                   FontWeight="Bold"
-                   Foreground="{StaticResource ErrorBrush}"
+                   Classes="card-title"
+                   Foreground="{DynamicResource DangerPanelTextBrush}"
                    HorizontalAlignment="Center"
                    IsVisible="{Binding #Root.IsFailedState}"/>
 
         <!-- 空态标题 -->
         <TextBlock Text="{Binding #Root.TitleText}"
-                   FontSize="{StaticResource SectionTitleFontSize}"
-                   FontWeight="Bold"
+                   Classes="card-title"
                    Foreground="{DynamicResource TextPrimaryBrush}"
                    HorizontalAlignment="Center"
                    IsVisible="{Binding #Root.IsEmptyState}"/>
 
         <!-- 加载提示 -->
         <TextBlock Text="{Binding #Root.TitleText}"
-                   FontSize="{StaticResource LabelFontSize}"
+                   Classes="body-sm"
                    Foreground="{DynamicResource TextSecondaryBrush}"
                    HorizontalAlignment="Center"
                    IsVisible="{Binding #Root.IsLoadingState}"/>
 
         <TextBlock Text="{Binding #Root.Message}"
-                   FontSize="{StaticResource LabelFontSize}"
-                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Classes="caption"
                    HorizontalAlignment="Center"
                    TextAlignment="Center"
                    TextWrapping="Wrap"
                    MaxWidth="{StaticResource MaxDialogWidth}"
                    IsVisible="{Binding #Root.HasMessage}"/>
 
-        <Button Classes="action-button"
+        <Button Classes="btn-secondary btn-sm"
                 HorizontalAlignment="Center"
                 Margin="{StaticResource SmallTopMargin}"
                 Command="{Binding #Root.RetryCommand}"
                 IsVisible="{Binding #Root.CanRetry}">
             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                <PathIcon Data="{StaticResource RefreshIcon}"
+                          Width="{StaticResource MiniIconSize}"
+                          Height="{StaticResource MiniIconSize}"
+                          VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding #Root.RetryText}" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>

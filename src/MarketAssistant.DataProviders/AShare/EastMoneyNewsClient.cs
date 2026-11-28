@@ -24,7 +24,7 @@ public sealed class EastMoneyNewsArticle
 /// </summary>
 public sealed class EastMoneyNewsClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 按纯数字股票代码搜索相关新闻。

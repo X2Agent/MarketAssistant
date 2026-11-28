@@ -15,7 +15,7 @@ namespace TestMarketAssistant.Application;
 
 /// <summary>
 /// <see cref="DailyBriefingService"/> 单元测试：当天缓存复用、强制刷新、
-/// 空输入跳过、Token 预算边界（自选/要闻条数、正文截断）与提示词内容。
+/// 空输入跳过、Token 预算边界（自选/要闻条数、正文截断）、提示词内容与空正文失败诊断。
 /// 直连 market.db 清理测试产生的简报行（内容以 StubReplyContent 前缀标识），
 /// 避免污染用户真实数据。
 /// </summary>
@@ -27,6 +27,8 @@ public sealed class DailyBriefingServiceTest
     private const string StubModelId = "stub-model";
 
     private static List<ChatMessage> _capturedRequests = [];
+    private static ChatOptions? _capturedOptions;
+    private static ChatResponse? _stubResponse;
     private static int _requestCount;
 
     private sealed class StubChatClient : IChatClient
@@ -38,7 +40,9 @@ public sealed class DailyBriefingServiceTest
         {
             Interlocked.Increment(ref _requestCount);
             _capturedRequests.Add(messages.Last());
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, StubReplyContent)));
+            _capturedOptions = options;
+            return Task.FromResult(
+                _stubResponse ?? new ChatResponse(new ChatMessage(ChatRole.Assistant, StubReplyContent)));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -203,6 +207,8 @@ public sealed class DailyBriefingServiceTest
     private static void ResetCounters()
     {
         _capturedRequests = [];
+        _capturedOptions = null;
+        _stubResponse = null;
         _requestCount = 0;
     }
 
@@ -357,6 +363,78 @@ public sealed class DailyBriefingServiceTest
         Assert.Contains("自行判断重要性", prompt, "重要性判断应交由模型，而非代码硬过滤");
         Assert.DoesNotContain("隔夜", prompt, "已移除『隔夜』措辞——数据源不保证覆盖隔夜时段");
         Assert.Contains("禁止编造", prompt);
+    }
+
+    /// <summary>
+    /// 不得限制输出 Token：推理模型的思考过程与正文共用输出额度，任何固定上限都可能让模型
+    /// 在思考阶段耗尽额度，得到"已计费却无正文"的空响应（曾导致简报持续生成失败）。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GenerateAsync_ShouldNotCapOutputTokens()
+    {
+        var service = CreateService(
+            [CreateFavorite("贵州茅台", "600519", "+1.5%")],
+            [CreateNews("央行公开市场净投放")]);
+
+        await service.GenerateAsync(force: true);
+
+        Assert.IsNotNull(_capturedOptions);
+        Assert.IsNull(_capturedOptions.MaxOutputTokens, "固定输出上限会被推理模型的思考过程耗尽");
+    }
+
+    /// <summary>
+    /// 推理模型思考耗尽额度（空正文 + finish_reason=length）：应抛出携带模型、结束原因与
+    /// 推理用量的 <see cref="FriendlyException"/>（界面原样展示），不重试，也不落盘。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GenerateAsync_EmptyContentWithLengthFinish_ShouldThrowFriendlyExceptionWithReasoningUsage()
+    {
+        _stubResponse = new ChatResponse(new ChatMessage(ChatRole.Assistant, []))
+        {
+            FinishReason = ChatFinishReason.Length,
+            Usage = new UsageDetails { InputTokenCount = 1200, OutputTokenCount = 2048, ReasoningTokenCount = 2048 }
+        };
+        var service = CreateService(
+            [CreateFavorite("贵州茅台", "600519", "+1.5%")],
+            [CreateNews("央行公开市场净投放")]);
+        var cachedBefore = await service.GetTodayAsync();
+
+        var exception = await Assert.ThrowsExactlyAsync<FriendlyException>(
+            () => service.GenerateAsync(force: true));
+
+        var cachedAfter = await service.GetTodayAsync();
+        Assert.Contains(StubModelId, exception.Message);
+        Assert.Contains("结束原因：length", exception.Message);
+        Assert.Contains("其中推理 2048 tokens", exception.Message);
+        Assert.Contains("非推理模型", exception.Message, "思考耗尽额度时应引导改用非推理模型");
+        Assert.AreEqual(1, _requestCount, "简报是单次调用，失败不应重试");
+        Assert.AreEqual(cachedBefore?.GeneratedAt, cachedAfter?.GeneratedAt, "失败结果不应落盘或覆盖已有缓存");
+    }
+
+    /// <summary>
+    /// 空正文但并非额度耗尽（如上游报错被包成 200 响应，无结束原因与用量）：
+    /// 应如实说明"服务商未返回用量"并引导稍后重试或换模型，而不是误导用户去换非推理模型。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GenerateAsync_EmptyContentWithoutUsage_ShouldThrowFriendlyExceptionWithUpstreamHint()
+    {
+        _stubResponse = new ChatResponse(new ChatMessage(ChatRole.Assistant, []));
+        var service = CreateService(
+            [CreateFavorite("贵州茅台", "600519", "+1.5%")],
+            [CreateNews("央行公开市场净投放")]);
+
+        var exception = await Assert.ThrowsExactlyAsync<FriendlyException>(
+            () => service.GenerateAsync(force: true));
+
+        Assert.Contains(StubModelId, exception.Message);
+        Assert.Contains("结束原因：未知", exception.Message);
+        Assert.Contains("服务商未返回用量", exception.Message);
+        Assert.Contains("上游服务", exception.Message);
+        Assert.DoesNotContain("非推理模型", exception.Message, "并非额度耗尽，不应引导更换模型类型");
+        Assert.AreEqual(1, _requestCount, "简报是单次调用，失败不应重试");
     }
 
     private static int CountBulletLines(string section)

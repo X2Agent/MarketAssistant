@@ -1,5 +1,4 @@
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Services.Trading.Exchanges;
@@ -87,6 +86,41 @@ public sealed class ExchangeConditionOrderServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public async Task SpotOco_ChangedProtection_ShouldCancelOnceAndClearLiveFlagWhenReplacementFails()
+    {
+        var ctx = CreateContext(futures: false);
+        var strategy = new TradingStrategy
+        {
+            Id = "grid-ai",
+            Type = StrategyType.AISignal,
+            Symbol = Symbol,
+            Status = StrategyStatus.Active,
+            ExecutionCount = 1,
+            Quantity = 1m,
+            Side = OrderSide.Buy,
+            StopLossPrice = 90m,
+            TakeProfitPrice = 110m,
+            CustomParams = "{}"
+        };
+        var stop = CreateManagedOrder(strategy.Id);
+        var take = CreateManagedOrder(strategy.Id);
+        take.ClientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id, ConditionOrderLeg.TakeProfit);
+        take.OrderId = "1000";
+        ctx.Strategies.Setup(s => s.GetStrategiesByStatusAsync(StrategyStatus.Active, It.IsAny<CancellationToken>())).ReturnsAsync([strategy]);
+        ctx.Data.Setup(d => d.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>())).ReturnsAsync([
+            new Position { StrategyId = strategy.Id, Side = PositionSide.Long, Quantity = 0.7m }]);
+        ctx.Client.Setup(c => c.GetOpenOrdersAsync(null, It.IsAny<CancellationToken>())).ReturnsAsync([stop, take]);
+        ctx.Executor.Setup(e => e.PlaceSpotProtectiveOcoAsync(strategy, 0.7m, It.IsAny<CancellationToken>())).ReturnsAsync(new OcoPlacementResult { Success = false });
+
+        await ctx.Service.ReconcileAsync(CancellationToken.None);
+
+        ctx.Client.Verify(c => c.CancelOrderAsync(Symbol, stop.OrderId, It.IsAny<CancellationToken>()), Times.Once);
+        ctx.Executor.Verify(e => e.PlaceSpotProtectiveOcoAsync(strategy, 0.7m, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.IsFalse(ctx.Service.HasLiveOrder(strategy.Id));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public async Task Futures_MissingProtectiveOrder_ShouldPlace_AndStoreFingerprint()
     {
         var ctx = CreateContext(futures: true);
@@ -99,13 +133,13 @@ public sealed class ExchangeConditionOrderServiceTest
             .ReturnsAsync([]);
         var placedRecord = new TradeRecord { ExchangeOrderId = 777, Status = TradeRecordStatus.Pending };
         ctx.Executor
-            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()))
+            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TradeResult { Success = true, Record = placedRecord });
 
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop, It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop, It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
             Times.Once, "缺失的保护策略条件单应补挂");
         ctx.Data.Verify(
             d => d.UpdateStrategyConditionOrderFingerprintAsync(
@@ -137,6 +171,48 @@ public sealed class ExchangeConditionOrderServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public async Task MalformedAiParams_ShouldPreserveExistingOrder_AndContinueOtherStrategyReconcile()
+    {
+        var ctx = CreateContext(futures: true);
+        var malformed = new TradingStrategy
+        {
+            Id = "malformed-ai",
+            Symbol = Symbol,
+            Type = StrategyType.AISignal,
+            Status = StrategyStatus.Active,
+            Side = OrderSide.Buy,
+            Quantity = 1m,
+            ExecutionCount = 1,
+            StopLossPrice = 90m,
+            CustomParams = "{broken"
+        };
+        var normal = CreateStopLossStrategy("normal-stoploss");
+        var existingMalformedOrder = CreateManagedOrder(malformed.Id);
+        ctx.Strategies
+            .Setup(s => s.GetStrategiesByStatusAsync(StrategyStatus.Active, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([malformed, normal]);
+        ctx.Client
+            .Setup(c => c.GetOpenOrdersAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([existingMalformedOrder]);
+        ctx.Executor
+            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TradeResult { Success = true, Record = new TradeRecord { ExchangeOrderId = 888 } });
+
+        await ctx.Service.ReconcileAsync(CancellationToken.None);
+
+        ctx.Client.Verify(
+            c => c.CancelOrderAsync(Symbol, existingMalformedOrder.OrderId, It.IsAny<CancellationToken>()),
+            Times.Never, "参数损坏策略的既有保护单不能被误判为孤儿撤销");
+        ctx.Executor.Verify(
+            e => e.PlaceConditionOrderAsync(malformed, It.IsAny<ConditionOrderLeg>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
+            Times.Never, "参数未知时不得补挂新的保护腿");
+        ctx.Executor.Verify(
+            e => e.PlaceConditionOrderAsync(normal, ConditionOrderLeg.Stop, It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
+            Times.Once, "单个损坏策略不得阻断其他策略的条件单补挂");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public async Task Futures_MatchedOrder_SameFingerprint_ShouldSkipPlace()
     {
         var ctx = CreateContext(futures: true);
@@ -153,7 +229,7 @@ public sealed class ExchangeConditionOrderServiceTest
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
             Times.Never, "挂单在位且指纹一致时不应重复挂单");
         ctx.Client.Verify(
             c => c.CancelOrderAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
@@ -176,7 +252,7 @@ public sealed class ExchangeConditionOrderServiceTest
             .Setup(c => c.GetOpenOrdersAsync(null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([managedOrder]);
         ctx.Executor
-            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()))
+            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TradeResult { Success = true, Record = new TradeRecord { ExchangeOrderId = 888 } });
 
         await ctx.Service.ReconcileAsync(CancellationToken.None);
@@ -185,7 +261,7 @@ public sealed class ExchangeConditionOrderServiceTest
             c => c.CancelOrderAsync(Symbol, managedOrder.OrderId, It.IsAny<CancellationToken>()),
             Times.Once, "参数漂移时应撤销旧条件单");
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop, It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop, It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
             Times.Once, "参数漂移撤旧后应按新参数重挂");
         ctx.Data.Verify(
             d => d.UpdateStrategyConditionOrderFingerprintAsync(
@@ -218,27 +294,33 @@ public sealed class ExchangeConditionOrderServiceTest
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
             Times.Never, "追踪未激活时提前挂交易所追踪单会过早止损，不应挂单");
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task Spot_ShouldShortCircuit_WithoutPlacing()
+    public async Task Spot_ShouldPlaceStopLossConditionOrder()
     {
+        // 现货没有 STOP_MARKET，用 STOP_LOSS（触发即市价）；
+        // 早期实现直接在现货短路、不挂任何条件单，导致应用关闭期间现货持仓完全无保护。
         var ctx = CreateContext(futures: false);
         ctx.Strategies
             .Setup(s => s.GetStrategiesByStatusAsync(StrategyStatus.Active, It.IsAny<CancellationToken>()))
             .ReturnsAsync([CreateStopLossStrategy()]);
+        ctx.Client
+            .Setup(c => c.GetOpenOrdersAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
 
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()),
-            Times.Never, "现货无条件单语义，退出型策略由客户端评估兜底");
+            e => e.PlaceConditionOrderAsync(
+                It.IsAny<TradingStrategy>(), ConditionOrderLeg.Stop, It.IsAny<decimal?>(), It.IsAny<CancellationToken>()),
+            Times.Once, "现货也必须挂交易所侧止损，否则应用关闭期间持仓无保护");
         ctx.Client.Verify(
             c => c.GetOpenOrdersAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
-            Times.Never, "现货模式不应查询交易所挂单");
+            Times.Once, "现货同样需要识别本应用已挂出的条件单，避免重复补挂");
     }
 
     [TestMethod]

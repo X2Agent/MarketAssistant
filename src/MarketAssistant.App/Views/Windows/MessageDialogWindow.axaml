@@ -2,27 +2,35 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:windows="using:MarketAssistant.Views.Windows"
         x:Class="MarketAssistant.Views.Windows.MessageDialogWindow"
-        Width="{StaticResource DialogWidth}"
-        MinWidth="300"
-        MaxWidth="500"
+        Width="{StaticResource DialogCardWidth}"
+        MinWidth="320"
+        MaxWidth="560"
         SizeToContent="Height"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource PageBackgroundBrush}">
 
-    <Border Padding="{StaticResource CardPadding}">
-        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+    <!-- 居中卡片规范：宽 440（400–480 区间内），内边距 24，圆角 12，无边框 -->
+    <Border Background="{DynamicResource CardBackgroundBrush}"
+            CornerRadius="{StaticResource CardCornerRadius}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            Padding="{StaticResource PagePadding}"
+            Margin="{StaticResource PagePaddingCompact}">
+        <StackPanel Spacing="{StaticResource SectionSpacing}">
 
             <!-- 消息内容 -->
             <TextBlock Name="MessageText"
                        TextWrapping="Wrap"
-                       FontSize="{StaticResource LabelFontSize}"
-                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       Classes="body"
+                       TextAlignment="Center"
                        HorizontalAlignment="Center"/>
 
-            <!-- 按钮区域 -->
-            <ItemsControl Name="ButtonItemsControl">
+            <!-- 按钮区域：首个按钮是确认动作（主按钮；危险操作时为危险按钮）。
+                 危险操作的取消钮绑定 Esc 并在窗口打开后取得焦点，回车 / 空格默认落在安全侧。
+                 ItemsControl 默认 ClipToBounds=True，而这一行的高度正好等于按钮高度，
+                 不关掉的话取消钮的焦点环会被裁掉上下两边 -->
+            <ItemsControl Name="ButtonItemsControl" ClipToBounds="False">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal"
@@ -34,8 +42,9 @@
                     <DataTemplate DataType="windows:MessageDialogWindow+DialogButton">
                         <Button Content="{Binding Text}"
                                 MinWidth="{StaticResource SmallButtonMinWidth}"
-                                Padding="{StaticResource PagePadding}"
                                 Classes.btn-primary="{Binding IsPrimary}"
+                                Classes.btn-danger="{Binding IsDanger}"
+                                IsCancel="{Binding IsCancel}"
                                 Click="OnButtonClick"/>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

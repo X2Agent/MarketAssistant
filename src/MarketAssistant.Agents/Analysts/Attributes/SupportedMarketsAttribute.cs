@@ -17,8 +17,10 @@ public sealed class SupportedMarketsAttribute : Attribute
     /// <param name="markets">支持的市场类型（至少一个）。</param>
     public SupportedMarketsAttribute(params MarketType[] markets)
     {
-        MarketType[] allMarkets = [.. Enum.GetValues<MarketType>()];
-        Markets = markets is { Length: > 0 } ? markets : allMarkets;
+        if (markets is not { Length: > 0 })
+            throw new ArgumentException("必须至少声明一个支持的市场；不限市场时请省略该特性（缺省即支持全部市场）", nameof(markets));
+
+        Markets = markets;
     }
 
     /// <summary>

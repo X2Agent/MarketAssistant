@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -28,9 +29,12 @@ public class KnowledgeGraphTools(UserKnowledgeGraphService kgService, ILogger<Kn
         if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(predicate) || string.IsNullOrWhiteSpace(obj))
             return "subject、predicate、object 不能为空。";
 
-        await _kgService.AddTripleAsync(subject, predicate, obj, validFrom, metadata);
-        _logger.LogInformation("Agent 添加知识图谱: {S} --[{P}]--> {O}", subject, predicate, obj);
-        return $"已记录关系: {subject} --[{predicate}]--> {obj}";
+        return await ToolExecutor.ExecuteAsync("添加知识图谱关系", $"{subject}--{obj}", _logger, async _ =>
+        {
+            await _kgService.AddTripleAsync(subject, predicate, obj, validFrom, metadata);
+            _logger.LogInformation("Agent 添加知识图谱: {S} --[{P}]--> {O}", subject, predicate, obj);
+            return $"已记录关系: {subject} --[{predicate}]--> {obj}";
+        });
     }
 
     [Description("查询某个实体的所有当前有效关系。用于了解用户关注的标的、某标的的关联信息等。")]
@@ -41,19 +45,22 @@ public class KnowledgeGraphTools(UserKnowledgeGraphService kgService, ILogger<Kn
         if (string.IsNullOrWhiteSpace(entity))
             return "请提供实体名称。";
 
-        var triples = await _kgService.QueryEntityAsync(entity, asOf);
-        if (triples.Count == 0)
-            return $"未找到与 \"{entity}\" 相关的关系记录。";
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"## {entity} 的关系网络 ({triples.Count} 条)");
-        foreach (var t in triples)
+        return await ToolExecutor.ExecuteAsync("查询知识图谱实体", entity, _logger, async _ =>
         {
-            var status = t.IsActive ? "" : " [已过期]";
-            var meta = string.IsNullOrEmpty(t.Metadata) ? "" : $" ({t.Metadata})";
-            sb.AppendLine($"- {t.Subject} --[{t.Predicate}]--> {t.Object} (自 {t.ValidFrom}){status}{meta}");
-        }
-        return sb.ToString();
+            var triples = await _kgService.QueryEntityAsync(entity, asOf);
+            if (triples.Count == 0)
+                return $"未找到与 \"{entity}\" 相关的关系记录。";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"## {entity} 的关系网络 ({triples.Count} 条)");
+            foreach (var t in triples)
+            {
+                var status = t.IsActive ? "" : " [已过期]";
+                var meta = string.IsNullOrEmpty(t.Metadata) ? "" : $" ({t.Metadata})";
+                sb.AppendLine($"- {t.Subject} --[{t.Predicate}]--> {t.Object} (自 {t.ValidFrom}){status}{meta}");
+            }
+            return sb.ToString();
+        });
     }
 
     [Description("使一条关系过期。当用户不再持有某标的、某关系不再成立时调用。")]
@@ -66,8 +73,11 @@ public class KnowledgeGraphTools(UserKnowledgeGraphService kgService, ILogger<Kn
         if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(predicate) || string.IsNullOrWhiteSpace(obj))
             return "参数不能为空。";
 
-        await _kgService.InvalidateAsync(subject, predicate, obj, ended);
-        return $"已标记过期: {subject} --[{predicate}]--> {obj}";
+        return await ToolExecutor.ExecuteAsync("使关系过期", $"{subject}--{obj}", _logger, async _ =>
+        {
+            await _kgService.InvalidateAsync(subject, predicate, obj, ended);
+            return $"已标记过期: {subject} --[{predicate}]--> {obj}";
+        });
     }
 
     [Description("获取某实体的完整时间线，包含历史和当前关系。用于追溯投资历史。")]
@@ -77,18 +87,21 @@ public class KnowledgeGraphTools(UserKnowledgeGraphService kgService, ILogger<Kn
         if (string.IsNullOrWhiteSpace(entity))
             return "请提供实体名称。";
 
-        var triples = await _kgService.TimelineAsync(entity);
-        if (triples.Count == 0)
-            return $"未找到 \"{entity}\" 的历史记录。";
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"## {entity} 时间线 ({triples.Count} 条记录)");
-        foreach (var t in triples)
+        return await ToolExecutor.ExecuteAsync("查询实体时间线", entity, _logger, async _ =>
         {
-            var period = t.ValidTo != null ? $"{t.ValidFrom} ~ {t.ValidTo}" : $"{t.ValidFrom} ~ 至今";
-            sb.AppendLine($"- [{period}] {t.Subject} --[{t.Predicate}]--> {t.Object}");
-        }
-        return sb.ToString();
+            var triples = await _kgService.TimelineAsync(entity);
+            if (triples.Count == 0)
+                return $"未找到 \"{entity}\" 的历史记录。";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"## {entity} 时间线 ({triples.Count} 条记录)");
+            foreach (var t in triples)
+            {
+                var period = t.ValidTo != null ? $"{t.ValidFrom} ~ {t.ValidTo}" : $"{t.ValidFrom} ~ 至今";
+                sb.AppendLine($"- [{period}] {t.Subject} --[{t.Predicate}]--> {t.Object}");
+            }
+            return sb.ToString();
+        });
     }
 
     public IEnumerable<AIFunction> GetFunctions()

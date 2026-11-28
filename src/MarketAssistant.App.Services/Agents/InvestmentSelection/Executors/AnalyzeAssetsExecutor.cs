@@ -1,9 +1,8 @@
-using System.Text.Json;
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
+using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.InvestmentSelection.Models;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI.Workflows;
@@ -21,9 +20,9 @@ public sealed partial class AnalyzeAssetsExecutor(
     IServiceProvider serviceProvider,
     ILogger<AnalyzeAssetsExecutor> logger) : Executor("AnalyzeAssets")
 {
-    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    private readonly ILogger<AnalyzeAssetsExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly ILogger<AnalyzeAssetsExecutor> _logger = logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
     {
@@ -36,21 +35,35 @@ public sealed partial class AnalyzeAssetsExecutor(
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        var originalRequest = input.OriginalRequest;
-        if (originalRequest == null)
-        {
-            _logger.LogError("[步骤3/3] 缺少原始请求信息");
-            return CreateDefaultResult("分析失败：缺少原始请求信息");
-        }
+        var result = await AnalyzeAsync(input, cancellationToken);
+
+        // 显式推入工作流输出队列：WithOutputFrom 的 auto-yield 在 RunStreamingAsync 路径下
+        // 会晚于事件流结束入队，WorkflowOutputEvent 丢失（同 CoordinatorExecutor）
+        await context.YieldOutputAsync(result, cancellationToken);
+
+        return result;
+    }
+
+    private async Task<InvestmentSelectionResult> AnalyzeAsync(
+        AssetScreeningResult input,
+        CancellationToken cancellationToken)
+    {
+        var originalRequest = input.OriginalRequest
+            ?? throw new InvalidOperationException("[步骤3/3] 缺少原始请求信息：上游工作流状态不一致");
 
         _logger.LogInformation("[步骤3/3-{MarketType}] 对筛选结果进行AI分析", originalRequest.MarketType);
 
         try
         {
+            var appliedCriteria = CriteriaDescriber.Describe(input.Criteria);
+
             if (input.ScreenedAssets.Count == 0)
             {
                 _logger.LogWarning("[步骤3/3-{MarketType}] 未筛选到符合条件的资产", originalRequest.MarketType);
-                return CreateDefaultResult("未找到符合条件的资产，建议放宽筛选条件。");
+                return CreateEmptyResult(
+                    "未找到符合条件的资产，建议放宽筛选条件。",
+                    originalRequest.IsNewsAnalysis ? SelectionType.NewsBased : SelectionType.UserRequest,
+                    appliedCriteria);
             }
 
             // 根据市场类型获取对应的数据格式化器
@@ -76,8 +89,7 @@ public sealed partial class AnalyzeAssetsExecutor(
                     typeof(InvestmentSelectionResult),
                     runtime.StructuredOutputMode,
                     JsonOptions),
-                Temperature = 0.2f,
-                MaxOutputTokens = 8000
+                Temperature = 0.2f
             };
             var response = await runtime.Client.GetResponseAsync(
                     [
@@ -92,57 +104,59 @@ public sealed partial class AnalyzeAssetsExecutor(
                 originalRequest.MarketType,
                 response.Text?.Length ?? 0);
 
-            var result = LlmJsonExtractor.Deserialize<InvestmentSelectionResult>(response.Text, JsonOptions);
+            var result = LlmJsonExtractor.Deserialize<InvestmentSelectionResult>(response.Text, JsonOptions)
+                ?? throw new FriendlyException(
+                    $"AI 响应反序列化失败，无法提取投资建议（响应长度 {response.Text?.Length ?? 0}）");
 
-            if (result == null)
+            var validationErrors = ValidateResult(result, input, originalRequest);
+            if (validationErrors.Count > 0)
+            {
+                throw new FriendlyException(
+                    $"AI 分析失败: AI 返回的数据不符合约束: {string.Join("; ", validationErrors)}");
+            }
+
+            if (result.Recommendations.Count == 0)
             {
                 _logger.LogWarning(
-                    "[步骤3/3-{MarketType}] 响应反序列化失败，响应长度: {ResponseLength}",
+                    "[步骤3/3-{MarketType}] AI 未生成任何推荐，响应长度: {ResponseLength}",
                     originalRequest.MarketType,
                     response.Text?.Length ?? 0);
-                result = CreateDefaultResult("解析分析结果失败");
             }
-            else
-            {
-                var validationErrors = ValidateResult(result, input, originalRequest);
-                if (validationErrors.Count > 0)
-                {
-                    throw new InvalidOperationException(
-                        $"AI 返回的数据不符合约束: {string.Join("; ", validationErrors)}");
-                }
 
-                if (result.Recommendations.Count == 0)
-                {
-                    _logger.LogWarning(
-                        "[步骤3/3-{MarketType}] AI 未生成任何推荐，响应长度: {ResponseLength}",
-                        originalRequest.MarketType,
-                        response.Text?.Length ?? 0);
-                }
-            }
+            AttachScreeningQuotes(result, input.ScreenedAssets);
+            result.AppliedCriteria = appliedCriteria;
 
             _logger.LogInformation("[步骤3/3-{MarketType}] 分析完成，推荐 {Count} 个资产，置信度: {Score}",
                 originalRequest.MarketType, result.Recommendations.Count, result.ConfidenceScore);
 
             return result;
         }
-        catch (OperationCanceledException)
-        {
-            // 用户主动取消必须向上传播，不得伪装成"分析失败"的默认结果
-            throw;
-        }
-        catch (FriendlyException)
-        {
-            // 校验失败等业务异常已包含用户友好信息，向上抛出让工作流以错误呈现
-            throw;
-        }
-        catch (Exception ex)
+        // 取消与已带用户友好信息的 FriendlyException 原样上抛，不二次包装
+        catch (Exception ex) when (ex is not (OperationCanceledException or FriendlyException))
         {
             _logger.LogError(ex, "[步骤3/3-{MarketType}] AI分析失败", originalRequest.MarketType);
             throw new FriendlyException($"AI 分析失败: {ex.Message}", ex);
         }
     }
 
-    private static List<string> ValidateResult(
+    /// <summary>
+    /// 把筛选快照中的现价与涨跌幅回填到推荐项，供界面对照目标价/止损价；
+    /// 调用前 <see cref="ValidateResult"/> 已保证每个推荐都存在于筛选结果中。
+    /// </summary>
+    private static void AttachScreeningQuotes(
+        InvestmentSelectionResult result,
+        List<ScreenerAssetInfo> screenedAssets)
+    {
+        var quotesBySymbol = screenedAssets.ToLookup(asset => asset.Symbol, StringComparer.OrdinalIgnoreCase);
+        foreach (var recommendation in result.Recommendations)
+        {
+            var quote = quotesBySymbol[recommendation.Symbol].First();
+            recommendation.CurrentPrice = quote.Current;
+            recommendation.ChangePercent = quote.Pct;
+        }
+    }
+
+    internal static List<string> ValidateResult(
         InvestmentSelectionResult result,
         AssetScreeningResult input,
         InvestmentSelectionWorkflowRequest request)
@@ -208,19 +222,6 @@ public sealed partial class AnalyzeAssetsExecutor(
             sb.AppendLine("## 用户需求");
             sb.AppendLine($"- 需求描述: {request.Content}");
             sb.AppendLine($"- 风险偏好: {request.RiskPreference}");
-
-            if (request.InvestmentAmount.HasValue)
-                sb.AppendLine($"- 投资金额: {request.InvestmentAmount:C}");
-
-            if (request.InvestmentHorizon.HasValue)
-                sb.AppendLine($"- 投资期限: {request.InvestmentHorizon}天");
-
-            if (request.PreferredSectors.Any())
-                sb.AppendLine($"- 偏好行业: {string.Join(", ", request.PreferredSectors)}");
-
-            if (request.ExcludedSectors.Any())
-                sb.AppendLine($"- 排除行业: {string.Join(", ", request.ExcludedSectors)}");
-
             sb.AppendLine();
         }
 
@@ -237,17 +238,24 @@ public sealed partial class AnalyzeAssetsExecutor(
         return sb.ToString();
     }
 
-    private InvestmentSelectionResult CreateDefaultResult(string message)
+    /// <summary>
+    /// 筛选阶段没有候选时的结果：这是正常的"无匹配"而不是分析失败，不带风险警示。
+    /// </summary>
+    private static InvestmentSelectionResult CreateEmptyResult(
+        string message,
+        SelectionType selectionType,
+        string appliedCriteria)
     {
         return new InvestmentSelectionResult
         {
-            SelectionType = SelectionType.UserRequest,
+            SelectionType = selectionType,
             Recommendations = [],
             ConfidenceScore = 0,
             AnalysisSummary = message,
-            MarketEnvironmentAnalysis = "无可用分析",
-            InvestmentAdvice = "建议重新尝试分析",
-            RiskWarnings = ["分析失败，请联系技术支持"]
+            MarketEnvironmentAnalysis = "未筛选到候选标的，本次未进行市场环境分析。",
+            InvestmentAdvice = "建议放宽筛选条件后重试。",
+            RiskWarnings = [],
+            AppliedCriteria = appliedCriteria
         };
     }
 }

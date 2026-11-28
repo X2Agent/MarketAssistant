@@ -13,12 +13,32 @@
     <vm:AlertHistoryViewModel/>
 </Design.DataContext>
 
+<UserControl.Resources>
+    <!-- 筛选项最小宽度：级别下拉比市场下拉多一个字，两者宽度分开定义保证选项文字不折行 -->
+    <x:Double x:Key="LevelFilterMinWidth">120</x:Double>
+    <x:Double x:Key="MarketFilterMinWidth">110</x:Double>
+</UserControl.Resources>
+
+<UserControl.Styles>
+    <!-- 告警行写在 DataTemplate 里：模板内本地的 {DynamicResource} 值会被 body-sm 类样式盖掉，
+         所以字重与次要色都用具名类表达，而不是写在元素属性上。
+         标题：未读用 Title 字重（配左侧强调点），已读保持 body-sm 的 Normal。
+         不拿 Emphasis(500) 当中间档：Windows 的中文回退字体只有 400 / 700 两档，
+         500 会随字体缓存里先加载了哪一档落到 Regular 或 Bold，已读 / 未读的字重差就不稳定。 -->
+    <Style Selector="TextBlock.alert-unread">
+        <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+    </Style>
+    <Style Selector="TextBlock.alert-content">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+</UserControl.Styles>
+
 <Grid RowDefinitions="Auto,Auto,*">
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="{StaticResource BottomMargin}">
         <TextBlock Grid.Column="0"
                    Text="最近告警事件（价格 / 风险 / 系统）"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                   Classes="card-title"
+                   VerticalAlignment="Center"/>
         <Button Grid.Column="1"
                 Content="全部已读"
                 Command="{Binding MarkAllReadCommand}"
@@ -35,7 +55,7 @@
         <ComboBox Grid.Column="0"
                   ItemsSource="{Binding LevelFilters}"
                   SelectedItem="{Binding SelectedLevelFilter}"
-                  MinWidth="120"
+                  MinWidth="{StaticResource LevelFilterMinWidth}"
                   Margin="{StaticResource SmallRightMargin}">
             <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:AlertLevelFilterOption">
@@ -46,7 +66,7 @@
         <ComboBox Grid.Column="1"
                   ItemsSource="{Binding MarketFilters}"
                   SelectedItem="{Binding SelectedMarketFilter}"
-                  MinWidth="110"
+                  MinWidth="{StaticResource MarketFilterMinWidth}"
                   Margin="{StaticResource SmallRightMargin}">
             <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:MarketFilterOption">
@@ -62,20 +82,27 @@
                    Text="{Binding VisibleCountText}"
                    VerticalAlignment="Center"
                    HorizontalAlignment="Right"
-                   Foreground="{DynamicResource TextSecondaryBrush}"
-                   FontSize="{StaticResource TinyFontSize}"/>
+                   Classes="caption"/>
     </Grid>
 
     <Panel Grid.Row="2">
-        <!-- 首屏骨架：5 行告警占位 -->
-        <StackPanel Spacing="{StaticResource SmallSpacing}"
-                    IsVisible="{Binding IsInitialLoading}">
-            <Border Classes="skeleton skeleton-row" Height="84"/>
-            <Border Classes="skeleton skeleton-row" Height="84"/>
-            <Border Classes="skeleton skeleton-row" Height="84"/>
-            <Border Classes="skeleton skeleton-row" Height="84"/>
-            <Border Classes="skeleton skeleton-row" Height="84"/>
-        </StackPanel>
+        <!-- 首屏骨架：5 条告警行。标题 14 / 正文 16 / 元信息 12，三段不同字号。 -->
+        <controls:SkeletonList Count="5"
+                               Spacing="{StaticResource SmallSpacing}"
+                               Margin="{StaticResource SmallBottomMargin}"
+                               IsVisible="{Binding IsInitialLoading}">
+            <controls:SkeletonList.ItemTemplate>
+                <DataTemplate>
+                    <controls:SkeletonCard Variant="Row">
+                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                            <controls:SkeletonLines Row="BodySm" LineWidths="200"/>
+                            <controls:SkeletonLines Row="Body" LineWidths="*"/>
+                            <controls:SkeletonLines Row="Caption" LineWidths="180"/>
+                        </StackPanel>
+                    </controls:SkeletonCard>
+                </DataTemplate>
+            </controls:SkeletonList.ItemTemplate>
+        </controls:SkeletonList>
 
         <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
             <ItemsControl ItemsSource="{Binding Alerts}">
@@ -85,58 +112,49 @@
                                 Padding="{StaticResource DefaultCardPadding}"
                                 CornerRadius="{StaticResource CardCornerRadius}"
                                 Background="{DynamicResource CardBackgroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="{StaticResource DefaultBorderThickness}">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <Panel Grid.Column="0" VerticalAlignment="Top" Margin="{StaticResource StatusDotMargin}">
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" IsVisible="{Binding IsLevelInfo}"/>
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource WarningBrush}" IsVisible="{Binding IsLevelWarning}"/>
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource ErrorBrush}" IsVisible="{Binding IsLevelCritical}"/>
+                                BorderThickness="{StaticResource NoBorderThickness}">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
+                                <!-- 未读标记：与标题首行等高居中；已读只占位不显示，整列标题左缘保持对齐 -->
+                                <Panel Grid.Column="0"
+                                       Width="8"
+                                       Height="{StaticResource BodySmLineHeight}"
+                                       VerticalAlignment="Top">
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{DynamicResource AccentBrush}"
+                                             IsVisible="{Binding !IsRead}"/>
                                 </Panel>
 
                                 <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <!-- 级别用文字标签表达（提示 / 警告 / 紧急），不再只靠一颗彩色圆点区分 -->
                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                        <TextBlock Text="{Binding Title}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        <Border Background="{DynamicResource HoverBackgroundBrush}"
-                                                CornerRadius="{StaticResource TinyCornerRadius}"
-                                                Padding="{StaticResource TagPadding}"
-                                                IsVisible="{Binding IsLevelCritical}">
-                                            <TextBlock Text="紧急"
-                                                       FontSize="{StaticResource TinyFontSize}"
-                                                       Foreground="{StaticResource ErrorBrush}"/>
-                                        </Border>
+                                        <TextBlock Classes="body-sm"
+                                                   Classes.alert-unread="{Binding !IsRead}"
+                                                   Text="{Binding Title}"
+                                                   VerticalAlignment="Center"/>
+                                        <controls:StatusTag Text="{Binding LevelText}"
+                                                            Classes.info="{Binding IsLevelInfo}"
+                                                            Classes.warning="{Binding IsLevelWarning}"
+                                                            Classes.danger="{Binding IsLevelCritical}"/>
                                         <TextBlock Text="{Binding OccurrenceText}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Classes="caption"
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <TextBlock Text="{Binding Content}"
-                                               TextWrapping="Wrap"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                               Classes="body-sm alert-content"
+                                               TextWrapping="Wrap"/>
 
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding SymbolText}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding MarketTypeText}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding LevelText}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Text="{Binding LocalTimeText}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    </StackPanel>
+                                    <WrapPanel Classes="meta">
+                                        <TextBlock Text="{Binding SymbolText}"/>
+                                        <TextBlock Text="{Binding MarketTypeText, StringFormat=' · {0}'}"/>
+                                        <TextBlock Text="{Binding LocalTimeText, StringFormat=' · {0}'}"/>
+                                    </WrapPanel>
                                 </StackPanel>
 
                                 <!-- 一键转 AI 归因：仅带标的历史告警可用（系统级告警无分析对象） -->
                                 <Button Grid.Column="2"
                                         Content="AI 归因"
-                                        Classes="btn-secondary"
+                                        Classes="btn-secondary btn-sm"
                                         VerticalAlignment="Top"
                                         IsVisible="{Binding HasSymbol}"
                                         Command="{Binding $parent[ItemsControl].((vm:AlertHistoryViewModel)DataContext).AskAiAttributionCommand}"

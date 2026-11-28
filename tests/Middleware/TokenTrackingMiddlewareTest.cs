@@ -52,7 +52,7 @@ public class TokenTrackingMiddlewareTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task LogAndAccumulate_ExceedsMaxCumulativeTokens_ShouldThrow()
+    public async Task LogAndAccumulate_SingleRunExceedsLimit_ShouldThrowButStillRecordUsage()
     {
         var chatClient = new Mock<IChatClient>().Object;
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "TestAgent" });
@@ -60,15 +60,42 @@ public class TokenTrackingMiddlewareTest
         var middleware = new TokenTrackingMiddleware(
             NullLogger<TokenTrackingMiddleware>.Instance);
 
-        // 上限内正常累计
+        // 单次运行在上限内正常累计
         middleware.LogAndAccumulate(session, inputTokens: 100_000, outputTokens: 50_000, agentName: "TestAgent");
-        var (input, output) = TokenTrackingMiddleware.GetCumulativeTokens(session);
-        Assert.AreEqual(150_000L, input + output);
 
-        // 累计突破 200k 熔断上限时抛出异常终止执行，防止工具调用循环失控
+        // 单次运行突破上限时抛出异常，使该次运行按失败处理；超限那次的用量仍计入统计
         var exception = Assert.ThrowsExactly<InvalidOperationException>(() =>
-            middleware.LogAndAccumulate(session, inputTokens: 100_000, outputTokens: 60_000, agentName: "TestAgent"));
+            middleware.LogAndAccumulate(
+                session,
+                inputTokens: TokenTrackingMiddleware.MaxTokensPerRun,
+                outputTokens: 1,
+                agentName: "TestAgent"));
+
         Assert.Contains("熔断", exception.Message);
+        var (input, output) = TokenTrackingMiddleware.GetCumulativeTokens(session);
+        Assert.AreEqual(100_000L + TokenTrackingMiddleware.MaxTokensPerRun, input);
+        Assert.AreEqual(50_001L, output);
+    }
+
+    // 聊天每轮重发整段历史，会话累计随轮数二次增长；累计值只做统计，不得让每轮都在上限内的对话被熔断
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task LogAndAccumulate_CumulativeBeyondLimitAcrossRuns_ShouldOnlyAccumulate()
+    {
+        var chatClient = new Mock<IChatClient>().Object;
+        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "TestAgent" });
+        var session = await agent.CreateSessionAsync();
+        var middleware = new TokenTrackingMiddleware(
+            NullLogger<TokenTrackingMiddleware>.Instance);
+
+        const int runCount = 30;
+        for (var run = 0; run < runCount; run++)
+            middleware.LogAndAccumulate(session, inputTokens: 10_000, outputTokens: 2_000, agentName: "TestAgent");
+
+        var (input, output) = TokenTrackingMiddleware.GetCumulativeTokens(session);
+        Assert.AreEqual(runCount * 10_000L, input);
+        Assert.AreEqual(runCount * 2_000L, output);
+        Assert.IsGreaterThan(TokenTrackingMiddleware.MaxTokensPerRun, input + output);
     }
 
     [TestMethod]

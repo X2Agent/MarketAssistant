@@ -81,17 +81,9 @@ public class AnalysisOrchestrationService(
             _logger.LogInformation("开始新的分析: {AssetCode}", assetCode);
             var report = await _workflow.AnalyzeAsync(assetCode, runId, cancellationToken);
 
-            // 先归档再缓存：归档失败时不缓存，避免"缓存命中但历史缺失"的幽灵报告
-            // 归档失败会抛异常，此时不缓存，让用户下次重试
-            try
-            {
-                await _archiveService.SaveAsync(report, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "归档失败，跳过缓存以避免幽灵报告: {AssetCode}", assetCode);
-                throw;
-            }
+            // 先归档再缓存：归档失败会抛异常，此时不缓存，
+            // 避免"缓存命中但历史缺失"的幽灵报告，让用户下次重试
+            await _archiveService.SaveAsync(report, cancellationToken);
 
             await _cacheService.CacheAnalysisAsync(assetCode, report);
 

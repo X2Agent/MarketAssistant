@@ -2,64 +2,76 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ================================================================== -->
-    <!-- 列表与表格样式 (List & Table Styles)                                  -->
-    <!-- 金融数据列表 — 清晰对齐、快速扫描、悬停反馈                            -->
+    <!-- MarketAssistant Design System v3.0 — Lists & Tables                  -->
+    <!--                                                                     -->
+    <!-- 行分隔不画线：数据行之间留 1px 的极浅色阶（DividerBrush），            -->
+    <!-- 视觉上像"行与行的呼吸"，而不是表格描边。                              -->
     <!-- ================================================================== -->
 
-    <!-- ===== ListBoxItem 基础样式 ===== -->
+    <!-- ===== ListBoxItem 基础 ===== -->
     <Style Selector="ListBoxItem">
-        <Setter Property="Padding" Value="{StaticResource SmallMargin}"/>
+        <Setter Property="Padding" Value="{StaticResource ListItemPadding}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
     </Style>
 
-    <!-- ===== 数据列表行 — 金融数据专用 ===== -->
-    <Style Selector="ListBoxItem.data-row">
-        <Setter Property="Padding" Value="12,8"/>
-        <Setter Property="MinHeight" Value="44"/>
-        <Setter Property="BorderThickness" Value="{StaticResource BottomBorderThickness}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
+    <!-- ===== plain-list：条目自己负责全部视觉（导航项、卡片、聊天气泡） =====
+         Fluent 把悬停 / 按下 / 选中的底色画在 ContentPresenter#PART_ContentPresenter 上，
+         只改 ListBoxItem.Background 不会生效，所以这里直接在 presenter 上把各状态清成透明。
+         需要状态底色的页面（如 nav-list）在自己的 Window / 页面样式里再覆盖 presenter：
+         页面样式离控件更近，优先级高于这里。 -->
+    <Style Selector="ListBox.plain-list ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
     </Style>
-    <Style Selector="ListBoxItem.data-row:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+    <Style Selector="ListBox.plain-list ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
-    <Style Selector="ListBoxItem.data-row:selected /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
+    <Style Selector="ListBox.plain-list ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
-    <Style Selector="ListBoxItem.data-row:selected TextBlock">
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    <Style Selector="ListBox.plain-list ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
-
-    <!-- ===== 交替行背景 ===== -->
-    <Style Selector="ListBoxItem.data-row-alt">
-        <Setter Property="Padding" Value="12,8"/>
-        <Setter Property="MinHeight" Value="44"/>
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    <Style Selector="ListBox.plain-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
 
-    <!-- ===== 股票代码列表项 ===== -->
-    <Style Selector="ListBoxItem.stock-item">
-        <Setter Property="Padding" Value="12,8"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="BorderThickness" Value="{StaticResource BottomBorderThickness}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.15"/>
-            </Transitions>
-        </Setter>
-    </Style>
-    <Style Selector="ListBoxItem.stock-item:pointerover">
-        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-    </Style>
-    <Style Selector="ListBoxItem.stock-item:selected">
-        <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
-    </Style>
+    <!-- ===== 数据行 ===== -->
+    <!-- 说明：data-row / stock-item 两个列表行变体已下线。全库列表行都用
+         <c>ListBoxItem</c> 的基础外观 + 页面自己的行样式（如 nav-list、serverCard），
+         通用变体零使用，留着只会让人以为"表格行有一套统一外观"。 -->
 
-    <!-- ===== ItemsControl 通用容器 ===== -->
+    <!-- ===== 容器 ===== -->
     <Style Selector="ItemsControl">
         <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- DataGrid：去掉外框与网格竖线，只保留行间极浅分隔 -->
+    <Style Selector="DataGrid">
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource SubtleBorderBrush}"/>
+        <Setter Property="RowBackground" Value="Transparent"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+    </Style>
+    <Style Selector="DataGridColumnHeader">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
+        <Setter Property="Padding" Value="12,10"/>
+    </Style>
+    <Style Selector="DataGridRow">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="MinHeight" Value="40"/>
+    </Style>
+    <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+        <Setter Property="Fill" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
 
 </Styles>

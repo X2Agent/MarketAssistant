@@ -14,8 +14,8 @@ using System.Globalization;
 namespace MarketAssistant.Applications.Briefing;
 
 /// <summary>
-/// 每日 AI 简报服务实现：单次 LLM 调用生成，严格 Token 预算（自选/要闻各取前 N 条、
-/// 内容截断、输出上限），按本地日期缓存。
+/// 每日 AI 简报服务实现：单次 LLM 调用生成，输入侧严格限量（自选/要闻各取前 N 条、
+/// 内容截断），按本地日期缓存。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
 public sealed class DailyBriefingService(
@@ -30,8 +30,8 @@ public sealed class DailyBriefingService(
 
     /// <summary>
     /// 纳入简报的要闻条数上限。
-    /// 数据源已按时间倒序返回约 28~29 小时（100 条）的快讯，此处取前 40 条入模，
-    /// 既覆盖当日隔夜与开盘前消息，又避免超长上下文导致 Token 成本失控。
+    /// 数据源按时间倒序返回最近一批快讯（A 股同花顺 100 条约 29 小时；虚拟币 Odaily 服务端上限 100 条约 17 小时，仅约一半为重要快讯，其实际跨度随时段波动），
+    /// 此处取前 40 条入模，既覆盖当日隔夜与开盘前消息，又避免超长上下文导致 Token 成本失控。
     /// 重要性与自选相关性交由模型判断，代码不做本地硬过滤（见 <c>BuildPrompt</c>）。
     /// </summary>
     public const int MaxNewsItems = 40;
@@ -44,11 +44,6 @@ public sealed class DailyBriefingService(
     /// 配合 40 条总量可把要闻输入控制在约 2100 token。
     /// </summary>
     public const int MaxNewsContentLength = 50;
-
-    /// <summary>简报正文字数上限（超出截断，防止单次响应膨胀）。</summary>
-    public const int MaxBriefingLength = 1200;
-
-    private const int MaxOutputTokens = 800;
 
     private readonly MarketType _marketType = marketType;
     private readonly IFavoriteService _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
@@ -148,25 +143,32 @@ public sealed class DailyBriefingService(
         var runtime = _chatClientFactory.CreateRuntime();
         var prompt = BuildPrompt(favorites, news);
 
+        // 刻意不设 MaxOutputTokens：推理模型的思考 Token 与正文共用输出额度，固定上限无法保证够用，
+        // 用尽即得到"已计费却没有正文"的空响应；输出长度交给服务商按模型设定的默认值。
         var requestMessage = new ChatMessage(ChatRole.User, prompt);
         var response = await runtime.Client.GetResponseAsync(
             [requestMessage],
-            new ChatOptions
-            {
-                Temperature = 0.3f,
-                MaxOutputTokens = MaxOutputTokens
-            },
+            new ChatOptions { Temperature = 0.3f },
             cancellationToken);
 
         var content = response.Text?.Trim() ?? string.Empty;
         if (content.Length == 0)
         {
-            throw new InvalidOperationException("简报生成失败：模型未返回有效内容");
-        }
+            // 空正文有多种成因（思考耗尽输出额度 / 上游错误 / 内容被拦截），
+            // 结束原因与用量是区分它们的唯一线索；用 FriendlyException 才能让界面原样展示，
+            // InvalidOperationException 会被 ErrorMessageMapper 映射成与真因无关的"操作无效"。
+            var usageText = response.Usage is { OutputTokenCount: { } reportedOutput } reportedUsage
+                ? $"输出 {reportedOutput} tokens"
+                    + (reportedUsage.ReasoningTokenCount is { } reportedReasoning
+                        ? $"，其中推理 {reportedReasoning} tokens"
+                        : string.Empty)
+                : "服务商未返回用量";
+            var hint = response.FinishReason == ChatFinishReason.Length
+                ? "输出额度（含推理模型的思考过程）已用尽，请在设置中改用非推理模型后重试"
+                : "可能是上游服务报错、限流或内容被拦截，请稍后重试或更换模型";
 
-        if (content.Length > MaxBriefingLength)
-        {
-            content = content[..MaxBriefingLength];
+            throw new FriendlyException(
+                $"模型 {runtime.ModelId} 未返回正文（结束原因：{response.FinishReason?.Value ?? "未知"}；{usageText}）。{hint}");
         }
 
         var (inputTokens, outputTokens, isPreciseUsage) = MeasureUsage(requestMessage, response);
@@ -233,7 +235,7 @@ public sealed class DailyBriefingService(
     }
 
     /// <summary>
-    /// 取要闻入模。数据源已按时间倒序返回约 28~29 小时（100 条）的快讯，
+    /// 取要闻入模。数据源已按时间倒序返回最近一批快讯（跨度见 <see cref="MaxNewsItems"/>），
     /// 此处只做条数截断，**不做本地重要性或相关性过滤**——
     /// 实测 A 股 <c>import</c> 字段 97% 为 0（无区分度）、88% 的快讯无关联股票，
     /// 基于这些信号做硬过滤等于用噪声决策，故交由模型自行判断。

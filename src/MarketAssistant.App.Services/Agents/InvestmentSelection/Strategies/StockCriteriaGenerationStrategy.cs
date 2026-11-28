@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -219,33 +218,7 @@ public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<St
 """;
     }
 
-    public override string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
-    {
-        if (request.IsNewsAnalysis)
-        {
-            return $"""
-                新闻内容：
-                {request.Content}
-
-                推荐股票数量限制：{request.MaxRecommendations}
-
-                请根据新闻内容生成股票筛选条件。
-                """;
-        }
-        else
-        {
-            return $"""
-                用户需求：
-                {request.Content}
-
-                推荐股票数量限制：{request.MaxRecommendations}
-
-                请根据用户需求生成股票筛选条件。
-                """;
-        }
-    }
-
-    public override StockCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
+    public override StockCriteria DeserializeCriteria(string json)
     {
         var criteria = LlmJsonExtractor.Deserialize<StockCriteria>(json, DeserializationOptions);
         if (criteria == null)
@@ -274,7 +247,7 @@ public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<St
             ValidateCondition(condition.Code, condition.MinValue, condition.MaxValue, index);
         }
 
-        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
+        criteria.Limit = IScreeningCriteria.CandidatePoolSize;
         return criteria;
     }
 

@@ -364,13 +364,13 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             if (!doc.RootElement.TryGetProperty("e", out var eventTypeProp))
                 return;
 
-            var eventType = eventTypeProp.GetString();
-            if (eventType == "executionReport")
-            {
-                var report = JsonSerializer.Deserialize<ExecutionReport>(json);
-                if (report is not null)
-                    OrderUpdate?.Invoke(report);
-            }
+            if (eventTypeProp.GetString() != "executionReport")
+                return;
+
+            // 从已解析的 JsonElement 反序列化，避免对整段消息文本二次 tokenize/解析
+            var report = doc.RootElement.Deserialize<ExecutionReport>();
+            if (report is not null)
+                OrderUpdate?.Invoke(report);
         }
         catch (Exception ex)
         {

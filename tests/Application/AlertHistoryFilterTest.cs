@@ -73,14 +73,6 @@ public sealed class AlertHistoryFilterTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void Matches_NullAlert_ShouldThrow()
-    {
-        Assert.ThrowsExactly<ArgumentNullException>(
-            () => AlertHistoryFilter.Matches(null!, null, null));
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public void Matches_MarketFilter_ShouldOnlyKeepSameMarket()
     {
         var aShare = CreateAlert("SH600519", "茅台异动", AlertLevel.Warning, MarketType.AShare);

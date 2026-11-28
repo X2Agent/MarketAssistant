@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ================================================================== -->
+    <!-- MarketAssistant Design System v3.0 — Elevation Tokens                -->
+    <!--                                                                     -->
+    <!-- 分层只用两件事：表面色阶（见 Colors.axaml）+ 这里定义的阴影。           -->
+    <!--                                                                     -->
+    <!-- 四条阴影纪律：                                                        -->
+    <!--  1. 卡片默认【无阴影】。卡片靠白色表面与页面底色 2%–3% 的差来分层。      -->
+    <!--  2. 只有真正"浮在内容之上、会遮挡内容"的元素才配阴影：                  -->
+    <!--     下拉菜单 / Popup / 弹出窗口 / 悬浮通知。                            -->
+    <!--  3. 禁止发光（colored glow）与毛玻璃（blur backdrop）。                 -->
+    <!--  4. 阴影只做"轻触"，不做"厚重"。重阴影＝大范围 + 低透明度，不是高透明度。 -->
+    <!-- ================================================================== -->
+
+    <!-- 层级 2：下拉菜单 / Popup / 自动补全浮层（真正的悬浮元素） -->
+    <BoxShadows x:Key="ShadowOverlay">0 4 12 0 #1A000000, 0 1 3 0 #14000000</BoxShadows>
+
+    <!-- 层级 3：模态窗口 / 悬浮通知（唯一允许出现"重阴影"的地方） -->
+    <BoxShadows x:Key="ShadowModal">0 12 32 0 #33000000, 0 2 8 0 #1A000000</BoxShadows>
+
+    <!-- 说明：v3 没有 "卡片阴影" 与 "拖拽阴影" 令牌。卡片靠表面色阶分层、不给阴影；
+         当前版本也没有拖拽排序场景。旧版的 ShadowCard / ShadowCardHover / ShadowDragging
+         已删除——留着只会被误用成"给卡片加一点阴影"。 -->
+
+    <!-- 焦点环：输入框/可聚焦元素用"双环"表达焦点，不画亮线、不改边框颜色。
+         内环 1px 实色贴边 + 外环 3px 半透明扩散。Avalonia 的 BoxShadow 列表按从内到外绘制，
+         这里用纯色环叠加实现，配合 CornerRadius 自动跟随圆角。 -->
+    <BoxShadows x:Key="FocusRing">0 0 0 1 #0066FF, 0 0 0 4 #290066FF</BoxShadows>
+
+    <!-- 选中环：卡片式单选（场景卡/模式卡）选中态的强调色标记，替代 1px 描边。
+         与 FocusRing 同几何，语义不同：FocusRing 表"键盘焦点"，AccentRing 表"当前选中"。 -->
+    <BoxShadows x:Key="AccentRing">0 0 0 1 #0066FF, 0 0 0 4 #290066FF</BoxShadows>
+
+</ResourceDictionary>

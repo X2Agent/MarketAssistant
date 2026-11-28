@@ -13,22 +13,62 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Resources/Styles/Colors.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Elevation.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Motion.axaml"/>
                 <ResourceInclude Source="/Resources/Styles/Spacing.axaml"/>
                 <ResourceInclude Source="/Resources/Styles/Geometries.axaml"/>
+                <!-- ToggleSwitch 主题必须在 Spacing/Colors 之后：它引用 BodySmFontSize 与主题色阶。
+                     放在 Resources 而非 Styles —— 资源查找优先 Resources，这是覆盖 FluentTheme
+                     内置 {x:Type ToggleSwitch} 主题的干净途径。 -->
+                <ResourceInclude Source="/Resources/Styles/ToggleSwitchStyles.axaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
   
     <Application.Styles>
-        <FluentTheme />
+        <!-- 锁定品牌强调色：FluentTheme 默认跟随 Windows 个性化强调色，
+             复选框、单选框、进度条、选中项会因此偏离 #0066FF（设计系统只允许一个强调色）。 -->
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="{StaticResource AccentColor}"/>
+                <ColorPaletteResources x:Key="Dark" Accent="{StaticResource AccentColor}"/>
+            </FluentTheme.Palettes>
+        </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+
+        <!-- 全局默认字体：Inter（拉丁）+ 中文回退链。必须在主题样式之后、组件样式之前，
+             这样组件样式未显式指定 FontFamily 时都会继承到这里。 -->
+        <Style Selector="Window">
+            <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+        </Style>
+        <Style Selector="UserControl">
+            <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+            <!-- 表格数字：等宽字体族缺失时（三平台回退各不相同）仍保证数字逐位对齐、刷新不跳动。
+                 只影响数字字形，不影响中文。等宽数字是"数值锁宽"的兜底，见 design.md 3.3。 -->
+            <Setter Property="FontFeatures" Value="tnum"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
+        </Style>
+
         <StyleInclude Source="/Resources/Styles/ButtonStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/CardStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/TextStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/ListStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/SkeletonStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/StatusStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/FormStyles.axaml"/>
         <StyleInclude Source="/Views/Controls/CardView.axaml"/>
+        <StyleInclude Source="/Views/Controls/PageHeaderView.axaml"/>
+        <StyleInclude Source="/Views/Controls/AssetCardView.axaml"/>
+        <StyleInclude Source="/Views/Controls/StatusBanner.axaml"/>
+        <StyleInclude Source="/Views/Controls/StatusTag.axaml"/>
     </Application.Styles>
 
     <!-- 系统托盘图标 -->

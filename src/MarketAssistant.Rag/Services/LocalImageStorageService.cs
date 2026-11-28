@@ -25,7 +25,7 @@ public sealed class LocalImageStorageService(ILogger<LocalImageStorageService>? 
 
     public async Task<string> SaveImageAsync(byte[] imageBytes, string? fileName, string documentPath, CancellationToken cancellationToken = default)
     {
-        ValidateInputs(imageBytes, fileName ?? string.Empty, documentPath);
+        ValidateInputs(imageBytes, documentPath);
 
         // Generate GUID-based filename if not provided
         if (string.IsNullOrWhiteSpace(fileName))
@@ -134,7 +134,7 @@ public sealed class LocalImageStorageService(ILogger<LocalImageStorageService>? 
         }
     }
 
-    private static void ValidateInputs(byte[] imageBytes, string fileName, string documentPath)
+    private static void ValidateInputs(byte[] imageBytes, string documentPath)
     {
         if (imageBytes == null || imageBytes.Length == 0)
             throw new ArgumentException("Image data cannot be null or empty", nameof(imageBytes));

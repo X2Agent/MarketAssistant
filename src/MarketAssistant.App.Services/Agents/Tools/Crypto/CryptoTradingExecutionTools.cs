@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using MarketAssistant.Agents.Tools.Abstractions;
-using MarketAssistant.DataProviders;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
@@ -12,129 +12,62 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Agents.Tools.Crypto;
 
 /// <summary>
-/// 虚拟币交易执行工具实现，供 TradingAgent 使用。下单委托给 TradeExecutor 统一入口。
+/// 虚拟币交易账户只读查询工具（余额、持仓、订单状态），供 TradingAgent 使用。
+/// 下单与撤单一律不暴露给模型：由 AISignalStrategyExecutor 解析决策后，经 TradeExecutor 统一风控执行。
 /// </summary>
 public class CryptoTradingExecutionTools(
     CryptoPortfolioService portfolioService,
     [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-    BinanceMarketDataService marketDataService,
-    TradeExecutor tradeExecutor,
-    ILogger<CryptoTradingExecutionTools> logger,
-    TradingHaltState? haltState = null) : ITradingExecutionTools
+    ILogger<CryptoTradingExecutionTools> logger) : ITradingExecutionTools
 {
     private readonly CryptoPortfolioService _portfolioService = portfolioService;
     private readonly IExchangeClient _exchangeClient = exchangeClient;
-    private readonly BinanceMarketDataService _marketDataService = marketDataService;
-    private readonly TradeExecutor _tradeExecutor = tradeExecutor;
-    private readonly TradingHaltState? _haltState = haltState;
     private readonly ILogger<CryptoTradingExecutionTools> _logger = logger;
 
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
-    public async Task<AccountBalanceSummary> GetAccountBalanceAsync(CancellationToken cancellationToken = default)
+    public Task<AccountBalanceSummary> GetAccountBalanceAsync(CancellationToken cancellationToken = default)
     {
-        return await _portfolioService.GetAccountBalanceSummaryAsync(cancellationToken);
+        return ToolExecutor.ExecuteAsync("查询账户余额", "-", _logger,
+            ct => _portfolioService.GetAccountBalanceSummaryAsync(ct), cancellationToken);
     }
 
     [Description("查询当前持仓列表，显示每个币种的数量、入场均价、当前价和未实现盈亏")]
-    public async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken cancellationToken = default)
+    public Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken cancellationToken = default)
     {
-        return await _portfolioService.GetCurrentPositionsAsync(cancellationToken);
-    }
-
-    [Description("下单交易。所有订单会先经过风控检查。symbol格式如BTCUSDT，side为Buy或Sell，type为Market或Limit")]
-    public async Task<TradeResult> PlaceOrderAsync(
-        [Description("交易对，如BTCUSDT")] string symbol,
-        [Description("买卖方向")] OrderSide side,
-        [Description("订单类型")] OrderType type,
-        [Description("交易数量")] decimal quantity,
-        [Description("限价单价格，市价单可不填")] decimal? price = null,
-        CancellationToken cancellationToken = default)
-    {
-        symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
-        var effectivePrice = price ?? 0;
-        if (type == OrderType.Market && effectivePrice == 0)
-        {
-            try
-            {
-                var ticker = await _marketDataService.Get24hrTickerAsync(symbol, cancellationToken);
-                if (ticker != null)
-                    effectivePrice = ticker.LastPrice;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "无法获取 {Symbol} 当前价格", symbol);
-            }
-        }
-
-        if (effectivePrice <= 0)
-            return new TradeResult { Success = false, ErrorMessage = $"无法确定 {symbol} 的有效价格，拒绝下单" };
-
-        var strategyId = TradingContext.CurrentStrategyId ?? "manual";
-        return await _tradeExecutor.ExecuteOrderAsync(
-            symbol, side, type, quantity, effectivePrice,
-            type == OrderType.Limit ? price : null,
-            strategyId: strategyId,
-            ct: cancellationToken);
+        return ToolExecutor.ExecuteAsync("查询当前持仓", "-", _logger,
+            ct => _portfolioService.GetCurrentPositionsAsync(ct), cancellationToken);
     }
 
     [Description("查询指定订单的状态")]
-    public async Task<OrderStatusInfo> GetOrderStatusAsync(
+    public Task<OrderStatusInfo> GetOrderStatusAsync(
         [Description("交易对")] string symbol,
         [Description("Binance订单ID")] long orderId,
         CancellationToken cancellationToken = default)
     {
-        symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
-        var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString(), cancellationToken);
-        var executedPrice = order.AveragePrice > 0
-            ? order.AveragePrice
-            : (order.CumulativeQuoteQty > 0 && order.ExecutedQty > 0
-                ? order.CumulativeQuoteQty / order.ExecutedQty
-                : order.Price);
-        return new OrderStatusInfo
-        {
-            OrderId = long.TryParse(order.OrderId, out var parsedOrderId) ? parsedOrderId : 0,
-            Symbol = order.Symbol,
-            Status = order.Status,
-            ExecutedQty = order.ExecutedQty,
-            ExecutedPrice = executedPrice
-        };
-    }
-
-    [Description("取消指定订单")]
-    public async Task<bool> CancelOrderAsync(
-        [Description("交易对")] string symbol,
-        [Description("Binance订单ID")] long orderId,
-        CancellationToken cancellationToken = default)
-    {
-        try
+        return ToolExecutor.ExecuteAsync("查询订单状态", symbol, _logger, async ct =>
         {
             symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
-            if (_haltState != null)
+            var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString(), ct);
+            var executedPrice = order.AveragePrice > 0
+                ? order.AveragePrice
+                : (order.CumulativeQuoteQty > 0 && order.ExecutedQty > 0
+                    ? order.CumulativeQuoteQty / order.ExecutedQty
+                    : order.Price);
+            return new OrderStatusInfo
             {
-                await _haltState.EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
-                if (_haltState.IsHalted)
-                {
-                    _logger.LogWarning("交易处于紧急停止状态，拒绝 Agent 撤单请求: {Symbol} {OrderId}", symbol, orderId);
-                    return false;
-                }
-            }
-
-            await _exchangeClient.CancelOrderAsync(symbol, orderId.ToString(), cancellationToken);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "取消订单失败: {Symbol} {OrderId}", symbol, orderId);
-            return false;
-        }
+                OrderId = long.TryParse(order.OrderId, out var parsedOrderId) ? parsedOrderId : 0,
+                Symbol = order.Symbol,
+                Status = order.Status,
+                ExecutedQty = order.ExecutedQty,
+                ExecutedPrice = executedPrice
+            };
+        }, cancellationToken);
     }
 
     public IEnumerable<AIFunction> GetFunctions()
     {
         yield return AIFunctionFactory.Create(GetAccountBalanceAsync);
         yield return AIFunctionFactory.Create(GetCurrentPositionsAsync);
-        yield return AIFunctionFactory.Create(PlaceOrderAsync);
         yield return AIFunctionFactory.Create(GetOrderStatusAsync);
-        yield return AIFunctionFactory.Create(CancelOrderAsync);
     }
 }

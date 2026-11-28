@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
@@ -28,6 +29,7 @@ public sealed class TradingAgentFactoryTest
         Assert.AreEqual(20, functionClient.MaximumIterationsPerRequest);
     }
 
+    // 余额、持仓是决策依据：缺失时拒绝创建 Agent，而不是在看不到账户的情况下决策
     [TestMethod]
     [TestCategory("Unit")]
     public void CreateAutomationAgent_MissingTradingTools_ShouldFailClosed()
@@ -40,6 +42,28 @@ public sealed class TradingAgentFactoryTest
 
         Assert.Contains(nameof(ITradingExecutionTools), exception.Message);
         Assert.Contains(nameof(MarketType.Crypto), exception.Message);
+    }
+
+    // 模型一次工具调用就能绕过执行器的置信度/仓位/方向校验，因此账户与策略工具必须恰为只读白名单。
+    // 新增只读工具时同步更新白名单；任何下单、撤单、改策略状态、建护栏类工具都不得加入。
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void TradingAgentTools_ShouldBeReadOnly()
+    {
+        IToolsProvider[] providers =
+        [
+            new CryptoTradingExecutionTools(null!, null!, NullLogger<CryptoTradingExecutionTools>.Instance),
+            new CryptoStrategyTools(null!, null!, NullLogger<CryptoStrategyTools>.Instance)
+        ];
+
+        var toolNames = providers
+            .SelectMany(provider => provider.GetFunctions())
+            .Select(function => function.Name)
+            .ToList();
+
+        CollectionAssert.AreEquivalent(
+            new[] { "GetAccountBalance", "GetCurrentPositions", "GetOrderStatus", "GetActiveStrategies", "GetStrategy" },
+            toolNames);
     }
 
     private static ServiceProvider CreateServices(bool includeTradingTools)

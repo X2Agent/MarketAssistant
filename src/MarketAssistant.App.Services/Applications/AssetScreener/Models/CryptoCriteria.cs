@@ -17,14 +17,9 @@ public class CryptoCriteria : IScreeningCriteria
     public List<CryptoScreeningCondition> Criteria { get; set; } = [];
 
     /// <summary>
-    /// 返回结果数量限制
+    /// 候选池大小（由系统固定，不取模型输出）
     /// </summary>
     public int Limit { get; set; } = 100;
-
-    /// <summary>
-    /// 交易所（如 Binance、Coinbase 等）
-    /// </summary>
-    public string? Exchange { get; set; }
 
     /// <summary>
     /// 交易对基准货币（如 USDT、BTC 等）

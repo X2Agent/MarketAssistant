@@ -1,5 +1,4 @@
 using MarketAssistant.DataProviders;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -15,13 +14,17 @@ public class RiskManager(
     [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
     TradingHaltState haltState,
     ApiHealthMonitor apiHealthMonitor,
-    ILogger<RiskManager> logger)
+    ILogger<RiskManager> logger,
+    BinanceMarketDataService? marketDataService,
+    StrategyPerformanceService? performanceService)
 {
     private readonly TradingDataService _dataService = dataService;
     private readonly CryptoPortfolioService _portfolioService = portfolioService;
     private readonly IExchangeClient _exchangeClient = exchangeClient;
     private readonly TradingHaltState _haltState = haltState;
     private readonly ApiHealthMonitor _apiHealthMonitor = apiHealthMonitor;
+    private readonly BinanceMarketDataService? _marketDataService = marketDataService;
+    private readonly StrategyPerformanceService? _performanceService = performanceService;
     private readonly ILogger<RiskManager> _logger = logger;
 
     /// <summary>
@@ -142,14 +145,39 @@ public class RiskManager(
             // 策略级上限让"这条策略最多把这个标的买到多大"可被单独约束，
             // 而不是所有策略共享同一个账户级额度互相挤占
             var singlePositionPercent = config.MaxSinglePositionPercent;
+            TradingStrategy? strategy = null;
             if (!isExitOrder && !string.IsNullOrEmpty(strategyId))
             {
-                var strategy = await _dataService.GetStrategyAsync(strategyId, ct).ConfigureAwait(false);
+                strategy = await _dataService.GetStrategyAsync(strategyId, ct).ConfigureAwait(false);
                 if (strategy?.MaxPositionPercent is > 0)
                 {
                     singlePositionPercent = singlePositionPercent > 0
                         ? Math.Min(singlePositionPercent, strategy.MaxPositionPercent.Value)
                         : strategy.MaxPositionPercent.Value;
+                }
+            }
+
+            // 实盘准入闸门（可选开启）：未经影子验证的自动策略不允许花真钱。
+            // 当前仅 AI 信号策略具备影子绩效可验证（定投/网格暂无影子路径，纳入只会永久拦单），
+            // 且只在非退出单上判定——已持仓的止损离场绝不能被准入规则挡住。
+            // 自动策略 ID 查无对应策略时按未通过准入拒单（fail-closed，与"杠杆设置
+            // 失败即拒开仓"同理，宁可误拒不可放行未经影子验证的真金下单）；
+            // 手动单（"manual"）不是闸门对象，正常放行。
+            if (!isExitOrder && config.RequireLivePromotion)
+            {
+                var isAutomatedOrder = !string.IsNullOrEmpty(strategyId)
+                    && !string.Equals(strategyId, "manual", StringComparison.OrdinalIgnoreCase);
+                var requiresPromotion = strategy is null
+                    ? isAutomatedOrder
+                    : LivePromotionGate.RequiresPromotion(strategy.Type);
+
+                if (requiresPromotion)
+                {
+                    var promotion = strategy is null
+                        ? new LivePromotionDecision(false, "策略信息不可用，无法核验实盘准入", 0)
+                        : await EvaluatePromotionAsync(strategy, ct).ConfigureAwait(false);
+                    if (!promotion.Allowed)
+                        return RiskCheckResult.Reject($"策略未通过实盘准入验证：{promotion.Reason}");
                 }
             }
 
@@ -187,7 +215,7 @@ public class RiskManager(
                     try
                     {
                         var exchangePositions = await _exchangeClient.GetPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
-                        var longPosition = exchangePositions?.FirstOrDefault(p =>
+                        var longPosition = exchangePositions.FirstOrDefault(p =>
                             string.Equals(p.Symbol, instrumentSymbol, StringComparison.OrdinalIgnoreCase) &&
                             p.PositionAmt > 0);
 
@@ -208,16 +236,28 @@ public class RiskManager(
                 }
                 else
                 {
-                    // 现货模式：使用本地 FIFO 持仓追踪校验
-                    // 注意用剩余未平仓数量（Quantity - ClosedQuantity）而非原始开仓量，
-                    // 否则部分平仓后仍按全额校验，会允许超出实际可卖数量的超卖
+                    // 现货模式：本地 FIFO 与交易所余额取更严者。
+                    // 本地账本只在应用自己成交时更新，外部（币安 App）卖出或条件单成交后会虚高，
+                    // 只信本地会让风控放行超出实际可用量的卖单，进而被交易所拒单或产生负持仓。
                     var positions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
-                    var availableQty = positions
+                    var localAvailableQty = positions
                         .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
                         .Sum(p => p.RemainingQuantity);
+
+                    var exchangeAvailableQty = await QuerySpotBaseAssetBalanceAsync(instrumentSymbol, ct)
+                        .ConfigureAwait(false);
+                    if (!exchangeAvailableQty.HasValue)
+                    {
+                        return RiskCheckResult.Reject(
+                            $"无法查询 {instrumentSymbol} 的交易所余额，现货卖出校验失败（fail-closed）");
+                    }
+
+                    var availableQty = Math.Min(localAvailableQty, exchangeAvailableQty.Value);
+
                     if (quantity > availableQty)
                         return RiskCheckResult.Reject(
-                            $"卖出数量 {quantity} 超过可用持仓 {availableQty}（含部分成交未同步的偏差）");
+                            $"卖出数量 {quantity} 超过可用持仓 {availableQty}（本地 {localAvailableQty}，"
+                            + $"交易所 {exchangeAvailableQty?.ToString() ?? "未知"}，含部分成交未同步的偏差）");
                 }
             }
 
@@ -230,7 +270,7 @@ public class RiskManager(
             {
                 try
                 {
-                    var positions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false) ?? [];
+                    var positions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false);
                     var symbolPosition = positions.FirstOrDefault(p =>
                         string.Equals(p.Symbol, instrumentSymbol, StringComparison.OrdinalIgnoreCase));
                     var currentPosAmt = symbolPosition?.PositionAmt ?? 0m;
@@ -256,6 +296,34 @@ public class RiskManager(
                     // fail-closed：无法确认现有敞口就不能放行新仓位
                     _logger.LogError(ex, "查询合约持仓用于名义敞口校验失败，拒绝交易（fail-closed）");
                     return RiskCheckResult.Reject("无法查询合约持仓，名义敞口校验失败（fail-closed）");
+                }
+            }
+
+            // 资金费率护栏（仅合约开仓）：临结算且费率对己方不利时推迟开仓。
+            // 放在名义敞口校验之后、余额校验之前——它是最"软"的一道闸门，
+            // 前面那些闸门任一不通过就没必要再查行情。
+            if (!isExitOrder
+                && _exchangeClient.IsFutures
+                && config.FundingRateGuardMinutes > 0)
+            {
+                var fundingRejection = await CheckFundingRateAsync(
+                    instrumentSymbol, side, config, ct).ConfigureAwait(false);
+                if (fundingRejection != null)
+                    return fundingRejection;
+            }
+
+            // 持仓标的数上限（仅开仓）：防止多标的同时同向开仓把相关性风险叠成一笔大杠杆。
+            // 判断依据是"本单是否会新建一个标的的持仓"，已在持仓中的标的加仓不受此限。
+            if (!isExitOrder && config.MaxConcurrentPositions > 0)
+            {
+                var openPositionSymbols = await GetConcurrentlyHeldSymbolsAsync(instrumentSymbol, ct)
+                    .ConfigureAwait(false);
+                if (!openPositionSymbols.Contains(instrumentSymbol)
+                    && openPositionSymbols.Count >= config.MaxConcurrentPositions)
+                {
+                    return RiskCheckResult.Reject(
+                        $"已持有 {openPositionSymbols.Count} 个标的，达到同时持仓上限 "
+                        + $"{config.MaxConcurrentPositions}，请先减少持仓再开新标的");
                 }
             }
 
@@ -323,6 +391,79 @@ public class RiskManager(
     }
 
     /// <summary>
+    /// 资金费率护栏：临结算 + 费率对本次开仓方向不利时拒单（推迟开仓）。
+    ///
+    /// 行情不可用时放行（返回 null）：资金费率只是"择时优化"，不该因为一个非资金安全的
+    /// 辅助查询失败而挡掉交易——与持仓/余额那类 fail-closed 校验的性质不同。
+    /// 判定规则见 <see cref="EvaluateFundingGuard"/>（纯逻辑，无 IO 便于单测）。
+    /// </summary>
+    private async Task<RiskCheckResult?> CheckFundingRateAsync(
+        string instrumentSymbol, OrderSide side, RiskConfig config, CancellationToken ct)
+    {
+        if (_marketDataService == null)
+            return null;
+
+        try
+        {
+            var premiumIndex = await _marketDataService
+                .GetPremiumIndexAsync(instrumentSymbol, ct).ConfigureAwait(false);
+            if (premiumIndex == null)
+                return null;
+
+            var rejection = EvaluateFundingGuard(instrumentSymbol, premiumIndex, side, config, DateTime.UtcNow);
+            if (rejection != null)
+                _logger.LogInformation("资金费率护栏拦单: {Symbol} {Side} {Reason}",
+                    instrumentSymbol, side, rejection.Reason);
+            return rejection;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "查询资金费率失败，跳过资金费护栏: {Symbol}", instrumentSymbol);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 资金费率护栏判定（纯逻辑，无 IO 便于单测）。
+    ///
+    /// 判定规则：
+    /// - 距下次结算超过 <see cref="RiskConfig.FundingRateGuardMinutes"/> → 放行（不临近结算）。
+    /// - 费率为正时多头付费、空头收费；费率为负时相反。
+    ///   本次方向若为付费方且 |费率| 超过 <see cref="RiskConfig.FundingRateTolerancePercent"/> → 拒单（推迟开仓）。
+    /// </summary>
+    internal static RiskCheckResult? EvaluateFundingGuard(
+        string instrumentSymbol, BinancePremiumIndexResponse premiumIndex, OrderSide side,
+        RiskConfig config, DateTime utcNow)
+    {
+        if (premiumIndex.NextFundingTime <= 0)
+            return null;
+
+        var nextFundingTime = DateTimeOffset.FromUnixTimeMilliseconds(premiumIndex.NextFundingTime).UtcDateTime;
+        var minutesToFunding = (nextFundingTime - utcNow).TotalMinutes;
+        if (minutesToFunding < 0 || minutesToFunding > config.FundingRateGuardMinutes)
+            return null;
+
+        var fundingRatePercent = premiumIndex.LastFundingRate * 100m;
+        if (Math.Abs(fundingRatePercent) < config.FundingRateTolerancePercent)
+            return null;
+
+        // 正费率：多头付费；负费率：空头付费
+        var sidePays = (fundingRatePercent > 0 && side == OrderSide.Buy)
+                       || (fundingRatePercent < 0 && side == OrderSide.Sell);
+        if (!sidePays)
+            return null;
+
+        return new RiskCheckResult
+        {
+            Deferred = true,
+            Reason = $"{instrumentSymbol} 距资金结算仅 {minutesToFunding:F0} 分钟，"
+                + $"当前费率 {fundingRatePercent:F4}% 对本次{SafeSideName(side)}方向不利，已推迟开仓"
+        };
+
+        static string SafeSideName(OrderSide value) => value == OrderSide.Buy ? "买入（多头）" : "卖出（空头）";
+    }
+
+    /// <summary>
     /// 从交易对符号提取基础资产（如 BTCUSDT → BTC、BTCFDUSD → BTC）。
     /// 复用统一的 <see cref="CryptoSymbolConverter.ExtractBaseCurrency"/>；
     /// 转换器对未匹配到已知计价后缀的输入会原样返回，此时视为解析失败返回 null。
@@ -333,6 +474,87 @@ public class RiskManager(
         return string.Equals(baseAsset, instrumentSymbol, StringComparison.OrdinalIgnoreCase)
             ? null
             : baseAsset;
+    }
+
+    /// <summary>
+    /// 评估策略的实盘准入状态。影子绩效查询失败时 fail-closed（不允许进入实盘）——
+    /// 这项校验本身就是"没证据不许交易"，查询失败等于没有证据。
+    /// </summary>
+    private async Task<LivePromotionDecision> EvaluatePromotionAsync(
+        TradingStrategy strategy, CancellationToken ct)
+    {
+        try
+        {
+            if (_performanceService == null)
+                return new LivePromotionDecision(false, "绩效服务不可用，按未通过准入处理", 0);
+
+            var shadow = await _performanceService.GetShadowAsync(strategy.Id, ct).ConfigureAwait(false);
+            var shadowMode = AISignalParams.FromJson(strategy.CustomParams)?.ShadowMode == true;
+            return LivePromotionGate.Evaluate(shadow, shadowMode);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "查询影子绩效失败，实盘准入按未通过处理: {StrategyId}", strategy.Id);
+            return new LivePromotionDecision(false, "无法读取影子绩效，按未通过准入处理", 0);
+        }
+    }
+
+    /// <summary>
+    /// 当前实际持有仓位的标的集合（合约取交易所持仓，现货取本地 FIFO 未平量）。
+    /// 查询失败时返回空集合：这项是"额外收紧"约束，不应因辅助查询失败而挡掉所有开仓。
+    /// </summary>
+    private async Task<HashSet<string>> GetConcurrentlyHeldSymbolsAsync(
+        string instrumentSymbol, CancellationToken ct)
+    {
+        var symbols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            if (_exchangeClient.IsFutures)
+            {
+                var exchangePositions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false);
+                foreach (var position in exchangePositions.Where(p => p.PositionAmt != 0))
+                    symbols.Add(position.Symbol);
+            }
+            else
+            {
+                var localPositions = await _dataService.GetOpenPositionsAsync(null, ct).ConfigureAwait(false);
+                foreach (var position in localPositions.Where(p => p.RemainingQuantity > 0))
+                    symbols.Add(position.Symbol);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "查询持仓标的数量失败，跳过持仓数上限校验: {Symbol}", instrumentSymbol);
+            return [];
+        }
+
+        // 调用方用 Contains(instrumentSymbol) 判断"是否已在持仓中"，这里补一次规范化
+        return symbols;
+    }
+
+    /// <summary>
+    /// 查询该交易对基础资产在现货账户的可用总量（free + locked）。
+    /// 查询失败返回 null，由调用方拒单；只有交易所明确返回余额才参与卖出校验。
+    /// </summary>
+    private async Task<decimal?> QuerySpotBaseAssetBalanceAsync(string instrumentSymbol, CancellationToken ct)
+    {
+        var baseAsset = TryExtractBaseAsset(instrumentSymbol);
+        if (string.IsNullOrEmpty(baseAsset))
+            return null;
+
+        try
+        {
+            var accountInfo = await _exchangeClient.GetAccountInfoAsync(ct).ConfigureAwait(false);
+            var balance = accountInfo.Balances.FirstOrDefault(b =>
+                b.Asset.Equals(baseAsset, StringComparison.OrdinalIgnoreCase));
+            return balance == null ? 0m : balance.Free + balance.Locked;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "查询现货余额失败，卖出校验退回本地持仓: {Symbol}", instrumentSymbol);
+            return null;
+        }
     }
 
 }

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 
 namespace MarketAssistant.Views.Controls;
@@ -58,10 +59,13 @@ public partial class LoadingDots : UserControl
     {
         InitializeComponent();
 
-        // 默认使用主题色
-        if (DotColor == null)
+        // 默认取强调色：DynamicResource 让它在主题切换后自动重算。
+        // 不能用 Application.FindResource("PrimaryBrush") —— v3 已删除 v2 的 Primary* 键，
+        // 取不到时返回 UnsetValue，圆点会因 Fill 为 null 而整个不可见。
+        // 使用点在 XAML 里显式给了 DotColor 时不覆盖它。
+        if (DotColor is null)
         {
-            DotColor = Application.Current?.FindResource("PrimaryBrush") as IBrush;
+            this[!DotColorProperty] = new DynamicResourceExtension("AccentBrush");
         }
     }
 }

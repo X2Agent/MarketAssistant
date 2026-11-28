@@ -1,5 +1,3 @@
-using MarketAssistant.Applications.Assets;
-
 namespace MarketAssistant.Applications.Market;
 
 /// <summary>
@@ -8,10 +6,6 @@ namespace MarketAssistant.Applications.Market;
 /// </summary>
 public static class MarketValueFormatter
 {
-    /// <summary>价格按量级选择小数位（与实时行情刷新共用 <see cref="PriceFormatter"/>）。</summary>
-    public static string FormatPrice(decimal? value) =>
-        value.HasValue ? PriceFormatter.Format(value.Value) : string.Empty;
-
     public static string FormatPercent(decimal? value) =>
         value.HasValue ? $"{value.Value:F2}%" : string.Empty;
 

@@ -22,94 +22,98 @@
         <vm:MCPConfigPageViewModel/>
     </Design.DataContext>
 
+    <!-- 单层两列 Grid：左栏服务器列表 / 右栏编辑表单（页头已移除，标题由左侧导航承担） -->
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="{StaticResource ServerListWidth}" MinWidth="240"/>
-            <ColumnDefinition Width="*" MinWidth="400"/>
+            <!-- 窄窗保护：左栏 240、右栏最小 320，合计 560 在 768px 窗口（减 48 页面边距）内可容纳 -->
+            <ColumnDefinition Width="{StaticResource ServerListWidth}" MinWidth="200"/>
+            <ColumnDefinition Width="*" MinWidth="300"/>
         </Grid.ColumnDefinitions>
         <!-- 左侧服务器列表 -->
         <Border Grid.Column="0" 
                 Background="{DynamicResource ItemBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource RightBorderThickness}">
+                BorderThickness="{StaticResource NoBorderThickness}">
             <Grid RowDefinitions="Auto,*,Auto">
-                <!-- 顶部操作区 -->
+                <!-- 顶部操作区：左栏整体白底贯穿，不再用整条色带切分（SurfaceVariant 的通栏用法会与页面底色 #F5F7FA 混淆，看起来像白板被挖了洞） -->
                 <Border Grid.Row="0" 
                         Padding="{StaticResource PagePadding}" 
-                        BorderBrush="{DynamicResource BorderBrush}" 
-                        BorderThickness="{StaticResource BottomBorderThickness}"
-                        Background="{DynamicResource CardBackgroundBrush}">
+                        Background="Transparent">
+                    <!-- 右栏出现编辑表单时，页面的主操作是「保存」：此处降为次要，避免同屏两个主按钮 -->
                     <Button Content="添加服务器" 
                             Command="{Binding AddServerCommand}" 
-                            Classes="btn-primary"
+                            Classes.btn-primary="{Binding !IsEditing}"
+                            Classes.btn-secondary="{Binding IsEditing}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"/>
                 </Border>
 
                 <!-- 服务器列表 -->
                 <Grid Grid.Row="1">
+                    <!-- plain-list：条目底色由 Fluent 画在 ListBoxItem 的 presenter 上，
+                         不清掉的话选中会露出一块饱和蓝底、悬停露出灰块，盖住下面卡片自己的状态样式 -->
                     <ListBox ItemsSource="{Binding ServerConfigs}"
+                             Classes="plain-list"
                              SelectedItem="{Binding SelectedConfig, Mode=TwoWay}"
                              Background="Transparent"
                              BorderThickness="{StaticResource NoBorderThickness}"
                              Padding="{StaticResource NoPadding}"
-                             Margin="{StaticResource SmallPadding}"
+                             Margin="{StaticResource TinyMargin}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.Name="MCP 服务器列表">
                         <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="Background" Value="Transparent"/>
-                            </Style>
-                            <Style Selector="ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-                                <Setter Property="Background" Value="Transparent"/>
+                            <!-- 服务器卡片表面：必须写成样式而不是 Border 上的局部属性，
+                                 否则局部 Background 的优先级会盖住下面 hover / 选中 的样式。 -->
+                            <Style Selector="Border.serverCard">
+                                <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+                                <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+                                <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+                                <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+                                <Setter Property="Transitions">
+                                    <Transitions>
+                                        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                                        <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
+                                    </Transitions>
+                                </Setter>
                             </Style>
                             <Style Selector="ListBoxItem:pointerover Border.serverCard">
                                 <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
                             </Style>
+                            <!-- 选中态：加深底色 + AccentRing 阴影环（与 mode-card 同一语义），不描边 -->
                             <Style Selector="ListBoxItem:selected Border.serverCard">
-                                <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+                                <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
+                                <Setter Property="BoxShadow" Value="{StaticResource AccentRing}"/>
                             </Style>
                         </ListBox.Styles>
                         <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="settings:MCPServerConfig">
+                                    <!-- 四周各留 4px：选中态的 AccentRing 向外延伸 4px，条目容器按自身边界裁剪，
+                                         不留白的话只剩底边一条蓝线 -->
                                     <Border Classes="serverCard"
-                                            Background="{DynamicResource CardBackgroundBrush}"
-                                            BorderBrush="{DynamicResource BorderBrush}"
-                                            BorderThickness="{StaticResource DefaultBorderThickness}"
-                                            CornerRadius="{StaticResource SmallCornerRadius}"
-                                            Padding="{StaticResource DefaultCardPadding}"
-                                            Margin="{StaticResource TinyBottomMargin}">
+                                            Margin="{StaticResource TinyMargin}">
 
                                         <StackPanel Spacing="{StaticResource TinySpacing}">
                                             <Grid ColumnDefinitions="*,Auto">
                                                 <TextBlock Text="{Binding Name}" 
-                                                           FontWeight="Bold"
+                                                           FontWeight="{DynamicResource WeightTitle}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                                            TextTrimming="CharacterEllipsis"/>
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                                        Padding="{StaticResource ChipPadding}"
-                                                        IsVisible="{Binding IsEnabled}">
-                                                    <TextBlock Text="启用" 
-                                                               FontSize="{StaticResource MiniFontSize}" 
-                                                               Foreground="{StaticResource SuccessBrush}"/>
+                                                <!-- 行内启用开关：外层 Border 吃掉点击并转发命令，
+                                                     否则点开关会选中 ListBoxItem（那会打开编辑表单）。
+                                                     Background=Transparent 是必需的：无底色的 Border 不能稳定命中测试。 -->
+                                                <Border Grid.Column="1"
+                                                        Background="Transparent"
+                                                        VerticalAlignment="Center"
+                                                        Cursor="Hand"
+                                                        PointerPressed="OnServerTogglePointerPressed">
+                                                    <ToggleSwitch Width="48"
+                                                                  IsHitTestVisible="False"
+                                                                  IsChecked="{Binding IsEnabled, Mode=OneWay}"
+                                                                  ToolTip.Tip="启用 / 停用该服务器"/>
                                                 </Border>
-                                                    <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                                            Padding="{StaticResource ChipPadding}"
-                                                            IsVisible="{Binding !IsEnabled}">
-                                                        <TextBlock Text="禁用"
-                                                                   FontSize="{StaticResource MiniFontSize}"
-                                                                   Foreground="{DynamicResource TextDisabledBrush}"/>
-                                                    </Border>
-                                                </StackPanel>
                                             </Grid>
                                             
                                             <TextBlock Text="{Binding Description}" 
-                                                       FontSize="{StaticResource SmallFontSize}" 
+                                                       FontSize="{StaticResource CaptionFontSize}" 
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxLines="2"/>
@@ -119,7 +123,7 @@
                                                     CornerRadius="{StaticResource TinyCornerRadius}"
                                                     Padding="{StaticResource ChipPadding}">
                                                 <TextBlock Text="{Binding TransportType}" 
-                                                           FontSize="{StaticResource MiniFontSize}" 
+                                                           FontSize="{StaticResource CaptionFontSize}" 
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </Border>
                                         </StackPanel>
@@ -138,71 +142,74 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        HorizontalAlignment="Center"/>
                             <TextBlock Text="点击上方按钮添加" 
-                                       FontSize="{StaticResource SmallFontSize}"
+                                       FontSize="{StaticResource CaptionFontSize}"
                                        Foreground="{DynamicResource TextDisabledBrush}"
                                        HorizontalAlignment="Center"/>
                         </StackPanel>
                 </Grid>
 
-                <!-- 工具审计：MCP 工具加载 / 白名单过滤事件（内存态，刷新重取） -->
+                <!-- 工具审计：MCP 工具加载 / 白名单过滤事件（内存态，刷新重取）。
+                     不用通栏色带：外层透明 + 内嵌次级表面块，左栏白底才贯穿到底 -->
                 <Border Grid.Row="2"
-                        Padding="{StaticResource PagePadding}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="{StaticResource TopBorderThickness}"
-                        Background="{DynamicResource CardBackgroundBrush}">
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0" Text="工具审计"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       VerticalAlignment="Center"/>
-                            <Button Grid.Column="1"
-                                    Command="{Binding RefreshAuditCommand}"
-                                    Content="刷新"
-                                    Background="Transparent"
-                                    Foreground="{StaticResource PrimaryBrush}"
-                                    FontSize="{StaticResource SmallFontSize}"
-                                    Padding="{StaticResource ChipPadding}"/>
-                        </Grid>
-                        <TextBlock IsVisible="{Binding HasNoAuditEntries}"
-                                   Text="暂无审计记录。工具在会话中加载后在此显示。"
-                                   TextWrapping="Wrap"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextDisabledBrush}"/>
-                        <ItemsControl ItemsSource="{Binding AuditEntries}"
-                                      IsVisible="{Binding HasAuditEntries}"
-                                      MaxHeight="180">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="{StaticResource TinySpacing}"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="mcp:McpToolAuditEntry">
-                                    <StackPanel Spacing="0">
-                                        <TextBlock TextWrapping="NoWrap"
-                                                   FontSize="{StaticResource SmallFontSize}"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}">
-                                            <Run Text="{Binding EventType, Converter={StaticResource EnumDescriptionConverter}}"/>
-                                            <Run Text=" "/>
-                                            <Run Text="{Binding ServerName}"/>
-                                            <Run Text=" / "/>
-                                            <Run Text="{Binding ToolName}"/>
-                                        </TextBlock>
-                                        <TextBlock TextWrapping="NoWrap"
-                                                   FontSize="{StaticResource MiniFontSize}"
-                                                   Foreground="{DynamicResource TextDisabledBrush}">
-                                            <Run Text="{Binding Category}"/>
-                                            <Run Text=" · "/>
-                                            <Run Text="{Binding Timestamp, StringFormat='{}{0:MM-dd HH:mm}'}"/>
-                                            <Run Text=" UTC"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
+                        Padding="{StaticResource DefaultPadding}"
+                        Background="Transparent">
+                    <Border Background="{DynamicResource SurfaceVariantBrush}"
+                            CornerRadius="{StaticResource SmallCornerRadius}"
+                            Padding="{StaticResource DefaultCardPadding}">
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="工具审计"
+                                           FontSize="{StaticResource BodySmFontSize}"
+                                           FontWeight="{DynamicResource WeightTitle}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Command="{Binding RefreshAuditCommand}"
+                                        Content="刷新"
+                                        Background="Transparent"
+                                        Foreground="{StaticResource AccentBrush}"
+                                        FontSize="{StaticResource CaptionFontSize}"
+                                        Padding="{StaticResource ChipPadding}"/>
+                            </Grid>
+                            <TextBlock IsVisible="{Binding HasNoAuditEntries}"
+                                       Text="暂无审计记录。工具在会话中加载后在此显示。"
+                                       TextWrapping="Wrap"
+                                       FontSize="{StaticResource CaptionFontSize}"
+                                       Foreground="{DynamicResource TextDisabledBrush}"/>
+                            <ItemsControl ItemsSource="{Binding AuditEntries}"
+                                          IsVisible="{Binding HasAuditEntries}"
+                                          MaxHeight="180">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="{StaticResource TinySpacing}"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="mcp:McpToolAuditEntry">
+                                        <StackPanel Spacing="0">
+                                            <TextBlock TextWrapping="NoWrap"
+                                                       FontSize="{StaticResource CaptionFontSize}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}">
+                                                <Run Text="{Binding EventType, Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                <Run Text=" "/>
+                                                <Run Text="{Binding ServerName}"/>
+                                                <Run Text=" / "/>
+                                                <Run Text="{Binding ToolName}"/>
+                                            </TextBlock>
+                                            <TextBlock TextWrapping="NoWrap"
+                                                       FontSize="{StaticResource CaptionFontSize}"
+                                                       Foreground="{DynamicResource TextDisabledBrush}">
+                                                <Run Text="{Binding Category}"/>
+                                                <Run Text=" · "/>
+                                                <Run Text="{Binding Timestamp, StringFormat='{}{0:MM-dd HH:mm}'}"/>
+                                                <Run Text=" UTC"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
                 </Border>
             </Grid>
         </Border>
@@ -217,8 +224,8 @@
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <!-- 服务器名称 -->
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                                <TextBlock Classes="form-label">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="名称"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Name}" 
@@ -226,13 +233,13 @@
                                          />
                                 <TextBlock Text="{Binding NameError}"
                                            IsVisible="{Binding NameError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           Foreground="{StaticResource ErrorBrush}"/>
+                                           FontSize="{StaticResource CaptionFontSize}"
+                                           Foreground="{DynamicResource ErrorBrush}"/>
                             </StackPanel>
 
                             <!-- 服务器描述 -->
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="描述" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="描述" Classes="form-label"/>
                                 <TextBox Text="{Binding Description}" 
                                          PlaceholderText="请输入服务器描述"
                                          Height="{StaticResource TextAreaHeight}"
@@ -243,8 +250,8 @@
 
                             <!-- 服务器类型 -->
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                                <TextBlock Classes="form-label">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="类型"/>
                                 </TextBlock>
                                 <WrapPanel Orientation="Horizontal">
@@ -264,43 +271,43 @@
 
                             <!-- 命令/URL配置（stdio 为命令，sse/streamableHttp 为 URL，占位提示随类型切换） -->
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                                <TextBlock Classes="form-label">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="命令 / URL"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" PlaceholderText="{Binding CommandPlaceholder}"/>
                                 <TextBlock Text="{Binding CommandHint}" 
-                                           FontSize="{StaticResource SmallFontSize}" 
+                                           FontSize="{StaticResource CaptionFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBlock Text="{Binding CommandError}"
                                            IsVisible="{Binding CommandError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                           FontSize="{StaticResource SmallFontSize}" 
-                                           Foreground="{StaticResource ErrorBrush}"/>
+                                           FontSize="{StaticResource CaptionFontSize}" 
+                                           Foreground="{DynamicResource ErrorBrush}"/>
                             </StackPanel>
 
                             <!-- 参数配置 (仅stdio) -->
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding IsStdio}">
-                                <TextBlock Text="参数" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="参数" Classes="form-label"/>
                                 <TextBox Text="{Binding Arguments}" 
                                          PlaceholderText="请输入命令参数，如-y @modelcontextprotocol/server-github"
                                          Height="{StaticResource ModeSelectionHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"/>
                                 <TextBlock Text="提示：多个参数请用空格分隔" 
-                                           FontSize="{StaticResource SmallFontSize}" 
+                                           FontSize="{StaticResource CaptionFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
                             <!-- 环境变量配置 (仅stdio) -->
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding IsStdio}">
-                                <TextBlock Text="环境变量" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="环境变量" Classes="form-label"/>
                                 <TextBox Text="{Binding EnvironmentVariablesText}"
                                          PlaceholderText="KEY1=value1&#10;KEY2=value2"
                                          Height="{StaticResource CompactTextAreaHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"/>
                                 <TextBlock Text="每行一个环境变量，格式为KEY=value" 
-                                           FontSize="{StaticResource SmallFontSize}" 
+                                           FontSize="{StaticResource CaptionFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
@@ -315,7 +322,7 @@
                                             Margin="{StaticResource TinyRightMargin}"
                                             IsEnabled="{Binding !AllowAllTools}"/>
                                     <TextBlock Text="空白名单默认不向 Agent 暴露任何工具"
-                                               FontSize="{StaticResource SmallFontSize}"
+                                               FontSize="{StaticResource CaptionFontSize}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                VerticalAlignment="Center"/>
                                 </WrapPanel>
@@ -326,9 +333,9 @@
                                         <DataTemplate>
                                             <CheckBox IsChecked="{Binding IsSelected}" Margin="{StaticResource TinyVerticalMargin}">
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="{DynamicResource WeightTitle}"/>
                                                     <TextBlock Text="{Binding Description}"
-                                                               FontSize="{StaticResource SmallFontSize}"
+                                                               FontSize="{StaticResource CaptionFontSize}"
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                TextTrimming="CharacterEllipsis"
                                                                MaxWidth="420"/>
@@ -338,92 +345,107 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
-
-                            <!-- 是否启用 -->
-                            <CheckBox IsChecked="{Binding IsEnabled}" Content="启用此服务器"/>
                         </StackPanel>
                     </controls:CardView>
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- 操作按钮区域 (固定在底部) -->
+            <!-- 操作按钮区域 (固定在底部)：与左栏「工具审计」同一套语言——内嵌次级表面块，不用通栏色带 -->
             <Border Grid.Row="1"
                     IsVisible="{Binding IsEditing}"
-                    Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="{StaticResource TopBorderThickness}"
-                    Padding="{StaticResource PagePadding}">
-                <Grid ColumnDefinitions="*,Auto">
-                    <!-- 测试状态显示 -->
-                    <StackPanel Grid.Column="0" 
-                                Orientation="Horizontal" 
-                                Spacing="{StaticResource SmallSpacing}"
-                                VerticalAlignment="Center"
-                                IsVisible="{Binding IsTesting}">
-                        <ProgressBar IsIndeterminate="True" 
-                                     Width="{StaticResource ProgressBarWidth}" 
-                                     Height="{StaticResource TinySpacing}"
-                                     VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding TestStatus}" 
+                    Background="Transparent"
+                    Padding="{StaticResource DefaultPadding}">
+                <Border Background="{DynamicResource SurfaceVariantBrush}"
+                        CornerRadius="{StaticResource SmallCornerRadius}"
+                        Padding="{StaticResource DefaultCardPadding}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <!-- 测试状态显示 -->
+                        <StackPanel Grid.Column="0" 
+                                    Orientation="Horizontal" 
+                                    Spacing="{StaticResource SmallSpacing}"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding IsTesting}">
+                            <ProgressBar IsIndeterminate="True" 
+                                         Width="{StaticResource ProgressBarWidth}" 
+                                         Height="{StaticResource TinySpacing}"
+                                         VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding TestStatus}" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding TestStatus}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                    
-                    <TextBlock Grid.Column="0"
-                               Text="{Binding TestStatus}"
-                               Foreground="{StaticResource SuccessBrush}"
-                               VerticalAlignment="Center"
-                               IsVisible="{Binding !IsTesting}"/>
-                    
-                    <!-- 按钮组 -->
-                    <WrapPanel Grid.Column="1"
-                               Orientation="Horizontal"
-                               HorizontalAlignment="Right">
-                        <Button Content="取消" 
-                                Command="{Binding CancelEditCommand}"
-                                Classes="btn-secondary"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"
-                                Margin="{StaticResource TinyLeftMargin}"/>
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding !IsTesting}"
+                                   Classes.test-success="{Binding IsTestStatusSuccessful}"
+                                   Classes.test-warning="{Binding IsTestStatusWarning}"
+                                   Classes.test-failed="{Binding IsTestStatusFailed}">
+                            <TextBlock.Styles>
+                                <Style Selector="TextBlock.test-success">
+                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                </Style>
+                                <Style Selector="TextBlock.test-warning">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                </Style>
+                                <Style Selector="TextBlock.test-failed">
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                </Style>
+                            </TextBlock.Styles>
+                        </TextBlock>
                         
-                        <Button Content="删除" 
-                                Command="{Binding DeleteServerCommand}"
-                                Classes="btn-danger"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"
-                                Margin="{StaticResource TinyLeftMargin}"
-                                IsVisible="{Binding SelectedConfig, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                        
-                        <Button Content="测试连接" 
-                                Command="{Binding TestConnectionCommand}"
-                                IsEnabled="{Binding !IsTesting}"
-                                Classes="btn-secondary"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"
-                                Margin="{StaticResource TinyLeftMargin}"/>
-                        
-                        <Button Content="保存" 
-                                Command="{Binding SaveServerCommand}"
-                                IsEnabled="{Binding !IsTesting}"
-                                Classes="btn-primary"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"
-                                Margin="{StaticResource TinyLeftMargin}"/>
-                    </WrapPanel>
-                </Grid>
+                        <!-- 按钮组 -->
+                        <WrapPanel Grid.Column="1"
+                                   Orientation="Horizontal"
+                                   HorizontalAlignment="Right">
+                            <Button Content="取消" 
+                                    Command="{Binding CancelEditCommand}"
+                                    Classes="btn-secondary"
+                                    MinWidth="{StaticResource MediumButtonMinWidth}"
+                                    Margin="{StaticResource TinyLeftMargin}"/>
+                            
+                            <Button Content="删除" 
+                                    Command="{Binding DeleteServerCommand}"
+                                    Classes="btn-danger"
+                                    MinWidth="{StaticResource MediumButtonMinWidth}"
+                                    Margin="{StaticResource TinyLeftMargin}"
+                                    IsVisible="{Binding SelectedConfig, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                            
+                            <Button Content="测试连接" 
+                                    Command="{Binding TestConnectionCommand}"
+                                    IsEnabled="{Binding !IsTesting}"
+                                    Classes="btn-secondary"
+                                    MinWidth="{StaticResource MediumButtonMinWidth}"
+                                    Margin="{StaticResource TinyLeftMargin}"/>
+                            
+                            <Button Content="保存" 
+                                    Command="{Binding SaveServerCommand}"
+                                    IsEnabled="{Binding !IsTesting}"
+                                    Classes="btn-primary"
+                                    MinWidth="{StaticResource MediumButtonMinWidth}"
+                                    Margin="{StaticResource TinyLeftMargin}"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
             </Border>
 
-            <!-- 未选择服务器时的提示 -->
-            <StackPanel Grid.Row="0" Grid.RowSpan="2"
-                        IsVisible="{Binding IsEditing, Converter={x:Static BoolConverters.Not}}"
-                        HorizontalAlignment="Center"
+            <!-- 未选择服务器时的提示：必须有不透明底，否则会与下方表单内容叠印 -->
+            <Border Grid.Row="0" Grid.RowSpan="2"
+                    Background="{DynamicResource CardBackgroundBrush}"
+                    IsVisible="{Binding IsEditing, Converter={x:Static BoolConverters.Not}}">
+            <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Spacing="{StaticResource LargeSpacing}">
                 <TextBlock Text="请选择或添加MCP服务器" 
                            Foreground="{DynamicResource TextSecondaryBrush}"
-                           FontSize="{StaticResource SubTitleFontSize}"
-                           HorizontalAlignment="Center"/>
-                <TextBlock Text="在左侧列表中选择一个服务器进行编辑，或点击“添加服务器”创建新配置" 
-                           Foreground="{DynamicResource TextDisabledBrush}"
                            FontSize="{StaticResource BodyFontSize}"
                            HorizontalAlignment="Center"/>
+                <TextBlock Text="在左侧列表中选择一个服务器进行编辑，或点击“添加服务器”创建新配置"
+                           Classes="caption"
+                           HorizontalAlignment="Center"/>
             </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

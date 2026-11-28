@@ -1,11 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Text.Json;
-using Avalonia;
-using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Notification;
@@ -87,8 +83,6 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         set { if (value) SelectedProfile = RiskProfile.Aggressive; }
     }
 
-    public OrderSide[] OrderSides => Enum.GetValues<OrderSide>();
-
     // ---- 智能策略（AI）参数 ----
     [ObservableProperty] private string _aiBudgetUsdt = string.Empty;
     [ObservableProperty] private string _aiIntervalSeconds = string.Empty;
@@ -99,6 +93,9 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isAiTrailingExit;
     [ObservableProperty] private string _aiTrailingPercent = string.Empty;
     [ObservableProperty] private bool _aiShadowMode;
+
+    /// <summary>maker 优先：先挂 post-only 限价，拒单立即回退市价（省 maker/taker 费率差）。</summary>
+    [ObservableProperty] private bool _aiMakerFirst;
     [ObservableProperty] private OrderSide _aiSide = OrderSide.Buy;
 
     [ObservableProperty] private bool _isCreating;
@@ -184,7 +181,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         IsMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
         ApplyScenarioPreset();
-        _ = InitializeAsync();
+        SetRetryCommand(() => LoadStrategiesAsync());
+        _ = LoadStrategiesAsync();
     }
 
     private void OnMonitorStatusChanged(bool isRunning)
@@ -193,15 +191,24 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         Avalonia.Threading.Dispatcher.UIThread.Post(() => IsMonitorRunning = isRunning);
     }
 
-    private async Task InitializeAsync()
+    /// <summary>
+    /// 首屏加载策略列表与风控配置。走 <see cref="ViewModelBase.LoadAsync"/> 以统一
+    /// 加载/空/失败三态（骨架屏 + StateOverlayView），不再用 SafeExecuteAsync 静默失败。
+    /// 空列表不算失败也不算"无数据页"：新建表单必须始终可操作，故空态由卡片内文案承担，
+    /// 浮层只负责失败重试；失败时页面只显示浮层（列表与风控设置都未读到，
+    /// 不能显示"暂无策略"，也不能开放保存），重试成功后恢复。
+    /// </summary>
+    private async Task LoadStrategiesAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
             RiskConfig = await _dataService.LoadRiskConfigAsync();
             var strategies = await _dataService.GetAllStrategiesAsync();
             Strategies.Clear();
             foreach (var s in strategies)
                 Strategies.Add(s);
+
+            return true;
         }, "加载策略列表");
     }
 
@@ -219,13 +226,22 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
             ValidationError = string.Empty;
             var symbol = CryptoSymbolConverter.ToBinanceFormat(NewSymbol);
 
-            TradingStrategy? strategy = SelectedScenario switch
+            TradingStrategy? strategy;
+            try
             {
-                ScenarioKind.AISmart => BuildAISignalStrategy(symbol),
-                ScenarioKind.DCA => BuildDCAStrategy(symbol),
-                ScenarioKind.Grid => BuildGridStrategy(symbol),
-                _ => null
-            };
+                strategy = SelectedScenario switch
+                {
+                    ScenarioKind.AISmart => BuildAISignalStrategy(symbol),
+                    ScenarioKind.DCA => BuildDCAStrategy(symbol),
+                    ScenarioKind.Grid => BuildGridStrategy(symbol),
+                    _ => null
+                };
+            }
+            catch (FormatException ex)
+            {
+                ValidationError = ex.Message;
+                return;
+            }
 
             if (strategy == null)
                 return; // 校验失败，ValidationError 已设置
@@ -236,7 +252,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
             // 安全警示必须显式可见：本应用没有交易所原生条件单兜底，
             // 止损/止盈/追踪止损全部由客户端按秒轮询执行，进程退出或网络中断期间不生效
             _notificationService.ShowWarning(
-                "⚠ 注意：止损/止盈/追踪止损由本程序每秒轮询执行，程序退出或断网期间不会触发，请勿完全依赖程序止损。");
+                "注意：止损/止盈/追踪止损由本程序每秒轮询执行，程序退出或断网期间不会触发，请勿完全依赖程序止损。");
 
             ClearForm();
         }, "创建策略");
@@ -267,7 +283,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
             TakeProfitPercent = ParseDecimalOr(AiTakeProfitPercent, 15),
             ExitStyle = IsAiTrailingExit ? "TrailingStop" : "FixedStop",
             TrailingPercent = ParseDecimalOr(AiTrailingPercent, 5),
-            ShadowMode = AiShadowMode
+            ShadowMode = AiShadowMode,
+            EntryOrderStyle = AiMakerFirst ? "MakerFirst" : "Market"
         };
 
         return new TradingStrategy
@@ -411,13 +428,31 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     }
 
     private static int ParseIntOr(string? text, int fallback)
-        => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : fallback;
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return fallback;
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0)
+            return value;
+        throw new FormatException("非空整数参数必须是大于 0 的有效整数");
+    }
 
     private static decimal ParseDecimalOr(string? text, decimal fallback)
-        => decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : fallback;
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return fallback;
+        if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0)
+            return value;
+        throw new FormatException("非空数值参数必须是大于 0 的有效数字，不能包含其他字符");
+    }
 
     private static decimal? ParseDecimalOrNullable(string? text)
-        => decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : null;
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0)
+            return value;
+        throw new FormatException("非空数值参数必须是大于 0 的有效数字，不能包含其他字符");
+    }
 
     [RelayCommand]
     private async Task ToggleStrategyAsync(TradingStrategy strategy)
@@ -458,6 +493,18 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task DeleteStrategyAsync(TradingStrategy strategy)
     {
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "删除策略",
+            $"确定删除策略「{strategy.Symbol} · {strategy.Type.GetDescription()}」吗？\n\n" +
+            "删除后无法恢复，成交记录与持仓会保留。\n\n" +
+            "它在交易所挂的止损 / 止盈条件单（如有）会被撤销，对应持仓将失去这层保护；" +
+            "监控未运行时，撤销推迟到下次启动监控。",
+            "删除",
+            "取消",
+            destructive: true);
+        if (!confirmed)
+            return;
+
         await SafeExecuteAsync(async () =>
         {
             await _strategyService.DeleteStrategyAsync(strategy.Id);
@@ -512,6 +559,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         DcaDoubleBuyBelowPrice = string.Empty;
         AiBudgetUsdt = string.Empty;
         AiShadowMode = false;
+        AiMakerFirst = false;
         ValidationError = string.Empty;
         IsCreating = false;
         ApplyScenarioPreset();

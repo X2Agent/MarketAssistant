@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using MarketAssistant.ViewModels;
+using MarketAssistant.ViewModels.Demo;
 using MarketAssistant.ViewModels.Trading;
+using MarketAssistant.Views.Demo;
 using MarketAssistant.Views.Pages;
 using MarketAssistant.Views.Pages.Trading;
 
@@ -30,6 +32,7 @@ public class ViewLocator : IDataTemplate
             AgentAnalysisViewModel => new AgentAnalysisPageView { DataContext = data },
             TradingPageViewModel => new TradingPageView { DataContext = data },
             BalanceDetailPageViewModel => new BalanceDetailPageView { DataContext = data },
+            CardPreviewViewModel => new CardPreviewView { DataContext = data },
             _ => new TextBlock { Text = $"未找到视图: {data.GetType().Name}" }
         };
     }

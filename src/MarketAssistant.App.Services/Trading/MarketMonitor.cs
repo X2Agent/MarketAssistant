@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using System.Threading.Channels;
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.DataProviders;
@@ -26,12 +25,21 @@ public class MarketMonitor : IDisposable
     private readonly RiskAlertEvaluator _riskAlertEvaluator;
     private readonly SignalAlertEvaluator _signalAlertEvaluator;
     private readonly TradingHaltState _haltState;
+    private readonly PositionReconciliationService _positionReconciliationService;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private CancellationTokenSource? _cts;
     private bool _isRunning;
     private Task? _consumerTask;
+    private Task? _reconciliationTask;
+
+    /// <summary>
+    /// 周期持仓对账间隔。交易所侧的成交（条件单触发、手动平仓）不会实时推送到本应用的账本，
+    /// 只在成交推送或下次评估时被发现；5 分钟一次可以在漂移影响风控前收敛，
+    /// 又不会让 REST 调用过于频繁。
+    /// </summary>
+    private static readonly TimeSpan PositionReconciliationInterval = TimeSpan.FromMinutes(5);
 
     // 价格管线：每个 symbol 仅保留最新价。写入方更新 map 并在首次标记时入队 symbol，
     // 消费端处理完移除标记——高负载下同一 symbol 的中间价自动合并为最新一次，避免逐条处理过期 tick
@@ -113,6 +121,7 @@ public class MarketMonitor : IDisposable
         _riskAlertEvaluator = null!;
         _signalAlertEvaluator = null!;
         _haltState = null!;
+        _positionReconciliationService = null!;
         _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketMonitor>.Instance;
         _priceUpdatedAdapter = static (_, _, _) => { };
         _connectionInterruptedAdapter = static () => { };
@@ -132,6 +141,7 @@ public class MarketMonitor : IDisposable
         RiskAlertEvaluator riskAlertEvaluator,
         SignalAlertEvaluator signalAlertEvaluator,
         TradingHaltState haltState,
+        PositionReconciliationService positionReconciliationService,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -146,6 +156,7 @@ public class MarketMonitor : IDisposable
         _riskAlertEvaluator = riskAlertEvaluator;
         _signalAlertEvaluator = signalAlertEvaluator;
         _haltState = haltState;
+        _positionReconciliationService = positionReconciliationService;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
         _connectionInterruptedAdapter = () =>
@@ -180,6 +191,12 @@ public class MarketMonitor : IDisposable
                 return;
             }
 
+            if (_tradeExecutor.ResolveClientSnapshot() is Exchanges.BinanceFuturesExchangeClient futures)
+                await futures.EnsureOneWayModeAsync(CancellationToken.None);
+
+            await _orderStateSyncService.SyncPendingOrdersAsync(force: true).ConfigureAwait(false);
+            await _positionReconciliationService.ReconcileAsync().ConfigureAwait(false);
+
             _cts = new CancellationTokenSource();
             _isRunning = true;
 
@@ -193,13 +210,16 @@ public class MarketMonitor : IDisposable
                 await _webSocketService.SubscribeAsync(WebSocketSubscriberKeys.MarketMonitor, instrumentSymbols);
 
             _webSocketService.PriceUpdated += _priceUpdatedAdapter;
-            _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
             _userDataStreamService.OrderUpdate += OnOrderUpdate;
             await _userDataStreamService.StartAsync();
 
             // 条件单对账：启动即对账一次（接管重启前的交易所挂单），之后周期补挂/撤孤儿单
             await _conditionOrderService.StartAsync();
+            _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
+
+            // 周期持仓对账：长会话期间交易所侧成交不会实时进入本地账本，需定期收敛
+            _reconciliationTask = Task.Run(() => RunPositionReconciliationLoopAsync(_cts.Token));
 
             _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
             StatusChanged?.Invoke(true);
@@ -239,6 +259,12 @@ public class MarketMonitor : IDisposable
             if (_consumerTask != null)
             {
                 try { await _consumerTask; }
+                catch (OperationCanceledException) { }
+            }
+
+            if (_reconciliationTask != null)
+            {
+                try { await _reconciliationTask; }
                 catch (OperationCanceledException) { }
             }
 
@@ -396,6 +422,31 @@ public class MarketMonitor : IDisposable
         }
     }
 
+    /// <summary>
+    /// 周期持仓对账循环。单次对账的失败由 <see cref="PositionReconciliationService.ReconcileAsync"/>
+    /// 内部隔离（记日志后下轮重试）；此处外层 catch 仅为兜底记录框架层异常（此时循环退出），
+    /// 对账失败不影响价格消费主链。
+    /// </summary>
+    private async Task RunPositionReconciliationLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(PositionReconciliationInterval);
+            while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            {
+                await _positionReconciliationService.ReconcileAsync(ct).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("持仓对账循环已取消");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "持仓对账循环异常退出");
+        }
+    }
+
     private void OnStrategiesChanged(object? sender, EventArgs e)
     {
         if (!_isRunning)
@@ -485,9 +536,12 @@ public class MarketMonitor : IDisposable
                 await _signalAlertEvaluator.NotifySignalExecutedSafeAsync(strategy, currentPrice);
 
             // HOLD/无持仓完结是正常路径：不进失败冷却，重试频率由
-            // StrategyEngine 的 LastTriggeredAt（analysisInterval）节流
-            if (result.Outcome != AISignalOutcome.NoTrade)
+            // StrategyEngine 的 LastTriggeredAt（analysisInterval）节流。
+            // 配置失败已在执行器内暂停并告警，这里不能再进入普通冷却或重复暂停。
+            if (result.Outcome is not (AISignalOutcome.NoTrade or AISignalOutcome.ConfigurationFailed))
+            {
                 await ApplyTradeFailurePolicy(strategy, result.TradeExecuted, result.TradeResult);
+            }
 
             await CheckStrategyCompletionAsync(strategy);
         }
@@ -572,11 +626,12 @@ public class MarketMonitor : IDisposable
         }
 
         var category = tradeResult?.FailureCategory ?? TradeFailureCategory.Other;
-        if (category == TradeFailureCategory.Rejected)
+        if (category is TradeFailureCategory.Rejected or TradeFailureCategory.OrderStateUnknown)
         {
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
-            await PauseStrategyAfterRejectionAsync(strategy, tradeResult);
-            await _riskAlertEvaluator.EvaluateRejectionSafeAsync(strategy, tradeResult);
+            await PauseStrategyForManualReviewAsync(strategy, tradeResult);
+            if (category == TradeFailureCategory.Rejected)
+                await _riskAlertEvaluator.EvaluateRejectionSafeAsync(strategy, tradeResult);
             return;
         }
 
@@ -586,14 +641,14 @@ public class MarketMonitor : IDisposable
     }
 
     /// <summary>
-    /// 拒绝类失败后暂停策略：状态置为 Paused（用户可在策略页重新启用），
+    /// 拒绝或订单状态未知后暂停策略：状态置为 Paused（用户可在策略页重新启用），
     /// 并经告警中心让用户知晓（策略静默停摆比反复重试更危险）。
     /// </summary>
-    private async Task PauseStrategyAfterRejectionAsync(TradingStrategy strategy, TradeResult? tradeResult)
+    private async Task PauseStrategyForManualReviewAsync(TradingStrategy strategy, TradeResult? tradeResult)
     {
-        var reason = tradeResult?.ErrorMessage ?? "交易被拒绝";
+        var reason = tradeResult?.ErrorMessage ?? "交易失败";
         _logger.LogWarning(
-            "策略 {StrategyId}（{Type} {Symbol}）触发被拒绝，已自动暂停: {Reason}",
+            "策略 {StrategyId}（{Type} {Symbol}）交易失败，已自动暂停等待人工检查: {Reason}",
             strategy.Id, strategy.Type, strategy.Symbol, reason);
 
         try
@@ -666,6 +721,12 @@ public class MarketMonitor : IDisposable
         if (string.IsNullOrEmpty(record.StrategyId) || record.StrategyId == "manual")
             return;
 
+        // 只有交易所侧条件单腿的成交才走保护性完结流程：普通成交（maker 进场挂单晚成交、
+        // 网格/定投限价单成交等）一旦误入，会把在场策略错误地完结并撤掉兄弟腿。
+        if (record.OrderType is not (OrderType.StopMarket or OrderType.TakeProfitMarket
+            or OrderType.TrailingStopMarket or OrderType.StopLoss or OrderType.TakeProfit))
+            return;
+
         _ = HandleProtectiveOrderFilledAsync(record);
     }
 
@@ -694,6 +755,13 @@ public class MarketMonitor : IDisposable
                 .CancelSiblingLegsAsync(strategy.Id, record.Symbol, record.ExchangeOrderId, MonitorToken)
                 .ConfigureAwait(false);
 
+            if (strategy.Type == StrategyType.AISignal && (await _dataService.GetOpenPositionsAsync(record.Symbol, MonitorToken))
+                .Any(p => p.StrategyId == strategy.Id && p.RemainingQuantity > 0))
+            {
+                _conditionOrderService.ClearLiveOrder(strategy.Id);
+                return;
+            }
+
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
@@ -717,7 +785,7 @@ public class MarketMonitor : IDisposable
 
         // 透传 MonitorToken：停止监控后不再执行 DB 查询/状态写回
         var updated = await _dataService.GetStrategyAsync(strategy.Id, MonitorToken);
-        if (updated != null && updated.ExecutionCount >= updated.MaxExecutions!.Value)
+        if (updated is { MaxExecutions: { } maxExecutions } && updated.ExecutionCount >= maxExecutions)
         {
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);

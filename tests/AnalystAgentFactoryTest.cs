@@ -164,10 +164,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
         var evaluator = CreateAnalystEvaluator(
             EvalChecks.ToolCalledCheck(
                 ToolCalledMode.Any,
-                "GetFundFlowAsync",
-                "GetBalanceSheetAsync",
-                "GetIncomeStatementAsync",
-                "GetFinancialRatiosAsync"),
+                "GetFundFlowAsync"),
             MeaningfulJsonResponseCheck());
 
         var results = await agent.EvaluateAsync(

@@ -1,5 +1,4 @@
 using AdaptiveCards;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.ComponentModel;
 using System.Reflection;
@@ -28,28 +27,22 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
             }
         }
 
-        try
+        var options = new JsonSerializerOptions
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true
-            };
-            options.Converters.Add(new JsonStringEnumConverter());
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
 
-            var model = JsonSerializer.Deserialize<T>(json, options);
-            if (model != null && IsValid(model))
-            {
-                card = Parse(model);
-                return true;
-            }
-        }
-        catch (Exception ex)
+        // 预检已命中说明这是本解析器负责的类型：反序列化或构卡失败属于异常，直接抛出，由转换器统一记录并回退原文
+        var model = JsonSerializer.Deserialize<T>(json, options);
+        if (model != null && IsValid(model))
         {
-            // 反序列化失败时记录警告，便于排查 JSON 格式问题
-            System.Diagnostics.Debug.WriteLine($"AdaptiveCard 反序列化失败: {ex.Message}");
+            card = Parse(model);
+            return true;
         }
+
         return false;
     }
 
@@ -80,6 +73,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
             colSet.Columns.Add(new AdaptiveColumn
             {
                 Width = "stretch",
+                Spacing = AdaptiveSpacing.Small,
                 VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
                 Items =
                 {
@@ -122,7 +116,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         if (score == null) return;
         var colSet = new AdaptiveColumnSet { Spacing = AdaptiveSpacing.Small };
         colSet.Columns.Add(new AdaptiveColumn { Width = "auto", Items = { new AdaptiveTextBlock { Text = label } } });
-        colSet.Columns.Add(new AdaptiveColumn { Width = "auto", Items = { new AdaptiveTextBlock { Text = score, Weight = AdaptiveTextWeight.Bolder } } });
+        colSet.Columns.Add(new AdaptiveColumn { Width = "auto", Spacing = AdaptiveSpacing.Small, Items = { new AdaptiveTextBlock { Text = score, Weight = AdaptiveTextWeight.Bolder } } });
         container.Add(colSet);
     }
 
@@ -139,6 +133,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         colSet.Columns.Add(new AdaptiveColumn
         {
             Width = "stretch",
+            Spacing = AdaptiveSpacing.Small,
             VerticalContentAlignment = AdaptiveVerticalContentAlignment.Bottom,
             Items = { new AdaptiveTextBlock { Text = label, IsSubtle = true, Wrap = true } }
         });
@@ -226,6 +221,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         titleCols.Columns.Add(new AdaptiveColumn
         {
             Width = "stretch",
+            Spacing = AdaptiveSpacing.Small,
             VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
             Items =
             {
@@ -275,6 +271,23 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
                 container.Add(new AdaptiveTextBlock { Text = "• " + item, Wrap = true, Spacing = AdaptiveSpacing.None });
             }
         }
+    }
+
+    private static readonly string[] BullishKeywords = ["买入", "做多", "利好"];
+    private static readonly string[] BearishKeywords = ["卖出", "减持", "做空", "利空"];
+
+    /// <summary>
+    /// 多空文字取色，遵循 A 股「红涨绿跌」约定（docs/design.md 2.5）。
+    /// Adaptive Card 调色板没有涨跌语义，这里借用 Attention（渲染为红）表示看多、Good（渲染为绿）表示看空；
+    /// 各 parser 一律走此方法，不要再手写 Good / Attention 判断。
+    /// </summary>
+    protected static AdaptiveTextColor DirectionColor(string text, AdaptiveTextColor neutral = AdaptiveTextColor.Default)
+    {
+        if (BullishKeywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal)))
+            return AdaptiveTextColor.Attention;
+        if (BearishKeywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal)))
+            return AdaptiveTextColor.Good;
+        return neutral;
     }
 
     /// <summary>

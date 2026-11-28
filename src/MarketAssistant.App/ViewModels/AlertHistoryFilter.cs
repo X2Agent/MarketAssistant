@@ -20,8 +20,6 @@ public static class AlertHistoryFilter
     /// </param>
     public static bool Matches(AlertEvent alert, AlertLevel? level, string? keyword, MarketType? marketType = null)
     {
-        ArgumentNullException.ThrowIfNull(alert);
-
         if (level is { } requiredLevel && alert.Level != requiredLevel)
             return false;
 

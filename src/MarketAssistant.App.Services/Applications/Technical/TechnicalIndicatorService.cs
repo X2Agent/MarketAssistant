@@ -21,8 +21,8 @@ public sealed class TechnicalIndicatorService(
     /// <summary>RSI 回溯周期（Wilder 标准 14）。</summary>
     private const int RsiPeriod = 14;
 
-    private readonly IKLineService _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
-    private readonly ILogger<TechnicalIndicatorService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IKLineService _kLineService = kLineService;
+    private readonly ILogger<TechnicalIndicatorService> _logger = logger;
 
     public async Task<TechnicalIndicatorSnapshot> GetSnapshotAsync(
         string code,
@@ -34,7 +34,7 @@ public sealed class TechnicalIndicatorService(
             throw new FriendlyException("代码不能为空，无法计算技术指标");
 
         var kLineData = await _kLineService.GetKLineDataAsync(code, kLineType, Math.Max(barCount, MinimumBarCount));
-        if (kLineData is null || kLineData.Count == 0)
+        if (kLineData.Count == 0)
             throw new FriendlyException($"K线数据为空，无法计算技术指标: {code}");
 
         var snapshot = CalculateFrom(kLineData);
@@ -49,7 +49,6 @@ public sealed class TechnicalIndicatorService(
     /// <inheritdoc />
     public TechnicalIndicatorSnapshot CalculateFrom(IReadOnlyList<KLineData> kLineData)
     {
-        ArgumentNullException.ThrowIfNull(kLineData);
         if (kLineData.Count == 0)
             throw new FriendlyException("K线数据为空，无法计算技术指标");
 

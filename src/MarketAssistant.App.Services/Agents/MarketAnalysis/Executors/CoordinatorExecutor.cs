@@ -1,7 +1,5 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Agents.MarketAnalysis.Artifacts;
 using Microsoft.Agents.AI;
@@ -9,6 +7,7 @@ using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Executors;
@@ -28,21 +27,51 @@ public sealed partial class CoordinatorExecutor(
     IAnalystArtifactStore artifactStore,
     ILogger<CoordinatorExecutor> logger) : Executor("Coordinator")
 {
-    private readonly AIAgent _coordinatorAgent = coordinatorAgent ?? throw new ArgumentNullException(nameof(coordinatorAgent));
-    private readonly ILogger<CoordinatorExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly AIAgent _coordinatorAgent = coordinatorAgent;
+    private readonly ILogger<CoordinatorExecutor> _logger = logger;
     private readonly Guid _runId = runId;
-    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore;
     private readonly MarketType _marketType = marketType;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
     {
         PropertyNameCaseInsensitive = true,
+        // 结论必填字段：漏填抛 JsonException，走修复重试与硬失败分支。
+        // 不用 [JsonRequired]：ReportArchiveService 用默认选项反序列化同一模型，
+        // 旧报告缺字段会整条读不出来；修饰器只作用于本 LLM 入口。
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { RequireConclusionFields } },
         Converters =
         {
             // 添加枚举转换器，支持字符串格式（使用原始枚举名称，如 "Hold"）
             new JsonStringEnumConverter()
         }
     };
+
+    /// <summary>
+    /// 把结论必填字段标记为 required：全默认值伪造（枚举 0 值恰为 强烈买入/低/短期、
+    /// 评分 0 被钳到 1.0）在解析入口即被拒绝。维度分嵌套字段不设必填——
+    /// A 股无 CryptoMetrics、加密市场无 News 分，跨市场统一必填会误伤；
+    /// 缺维度分仍由 StructuredOutputValidator 的 Range 校验走钳制降级。
+    /// </summary>
+    private static void RequireConclusionFields(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Type != typeof(CoordinatorResult))
+            return;
+
+        string[] requiredProperties =
+        [
+            nameof(CoordinatorResult.OverallScore),
+            nameof(CoordinatorResult.InvestmentRating),
+            nameof(CoordinatorResult.RiskLevel),
+            nameof(CoordinatorResult.TimeHorizon),
+            nameof(CoordinatorResult.DimensionScores)
+        ];
+        foreach (var required in requiredProperties)
+        {
+            typeInfo.Properties.First(property =>
+                string.Equals(property.Name, required, StringComparison.OrdinalIgnoreCase)).IsRequired = true;
+        }
+    }
 
     /// <summary>首次调用 + 1 次修复重试</summary>
     private const int MaxAttempts = 2;
@@ -56,9 +85,7 @@ public sealed partial class CoordinatorExecutor(
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("CoordinatorExecutor.HandleAsync 被调用，收到 {Count} 条消息", analystMessages?.Count ?? 0);
-
-        ArgumentNullException.ThrowIfNull(analystMessages);
+        _logger.LogDebug("CoordinatorExecutor.HandleAsync 被调用，收到 {Count} 条消息", analystMessages.Count);
 
         if (analystMessages.Count == 0)
         {
@@ -78,209 +105,209 @@ public sealed partial class CoordinatorExecutor(
             assetSymbol,
             analystMessages.Count);
 
-        try
-        {
-            LogMessageDiagnostics("协调分析师收到上游消息", analystMessages);
+        LogMessageDiagnostics("协调分析师收到上游消息", analystMessages);
 
-            // 过滤消息：移除包含工具调用(FunctionCallContent)和结果(FunctionResultContent)的消息
-            // 这样可以显著减少 Token 消耗，并避免 Coordinator 被中间过程干扰
-            var filteredMessages = analystMessages
-                .Where(m => !m.Contents.Any(c => c is FunctionCallContent or FunctionResultContent))
-                .ToList();
+        // 过滤消息：移除包含工具调用(FunctionCallContent)和结果(FunctionResultContent)的消息
+        // 这样可以显著减少 Token 消耗，并避免 Coordinator 被中间过程干扰
+        var filteredMessages = analystMessages
+            .Where(m => !m.Contents.Any(c => c is FunctionCallContent or FunctionResultContent))
+            .ToList();
+
+        _logger.LogInformation(
+            "协调分析师输入过滤完成，原始消息: {OriginalCount}，保留消息: {FilteredCount}",
+            analystMessages.Count,
+            filteredMessages.Count);
+        LogMessageDiagnostics("协调分析师过滤后输入", filteredMessages);
+
+        // 所有分析师均无文本输出（仅产生工具调用）时，无法生成有意义的综合报告
+        if (filteredMessages.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "所有分析师均未产生文本结论，无法生成综合报告");
+        }
+
+        // 构建聊天消息列表
+        var messages = new List<ChatMessage>(filteredMessages)
+        {
+            // 添加用户请求：生成综合报告
+            new ChatMessage(
+            ChatRole.User,
+            $"请基于以上所有分析师的专业意见，为标的 {assetSymbol} 生成一份综合分析报告。")
+        };
+
+        _logger.LogInformation(
+            "调用协调分析师，输入消息: {MessageCount}，输入文本总长度: {TextLength}",
+            messages.Count,
+            messages.Sum(message => message.Text?.Length ?? 0));
+
+        // 修复重试循环：解析/校验失败时将错误清单反馈给模型（同一对话上下文）重试，
+        // 仍失败则分层降级（null 硬伤抛异常，值违规钳制后接受），避免作废整个分析流程。
+        CoordinatorResult? coordinatorResult = null;
+        ChatMessage? coordinatorMessage = null;
+        var validationErrors = new List<string>();
+        var parseFailed = false;
+
+        for (var attempt = 1; attempt <= MaxAttempts; attempt++)
+        {
+            // 使用带结构化输出的 ChatClientAgent 运行。
+            // session: null — 无状态一次性调用，无需会话累积。
+            var startedAt = Stopwatch.GetTimestamp();
+            var agentResponse = await _coordinatorAgent.RunAsync(
+                messages,
+                session: null,
+                options: null,
+                cancellationToken);
+            var elapsed = Stopwatch.GetElapsedTime(startedAt);
 
             _logger.LogInformation(
-                "协调分析师输入过滤完成，原始消息: {OriginalCount}，保留消息: {FilteredCount}",
-                analystMessages.Count,
-                filteredMessages.Count);
-            LogMessageDiagnostics("协调分析师过滤后输入", filteredMessages);
+                "协调分析师调用完成（第 {Attempt}/{MaxAttempts} 次），耗时: {ElapsedMs} ms，响应消息: {MessageCount}，聚合文本长度: {TextLength}",
+                attempt,
+                MaxAttempts,
+                elapsed.TotalMilliseconds,
+                agentResponse.Messages.Count,
+                agentResponse.Text?.Length ?? 0);
+            LogMessageDiagnostics("协调分析师原始响应", agentResponse.Messages);
 
-            // 所有分析师均无文本输出（仅产生工具调用）时，无法生成有意义的综合报告
-            if (filteredMessages.Count == 0)
+            // 提取协调分析师的回复（最后一条 Assistant 消息）
+            coordinatorMessage = agentResponse.Messages
+                .LastOrDefault(m => m.Role == ChatRole.Assistant);
+
+            if (coordinatorMessage == null)
             {
-                throw new InvalidOperationException(
-                    "所有分析师均未产生文本结论，无法生成综合报告");
+                throw new InvalidOperationException("协调分析师未能生成报告");
             }
 
-            // 构建聊天消息列表
-            var messages = new List<ChatMessage>(filteredMessages)
-            {
-                // 添加用户请求：生成综合报告
-                new ChatMessage(
-                ChatRole.User,
-                $"请基于以上所有分析师的专业意见，为标的 {assetSymbol} 生成一份综合分析报告。")
-            };
-
+            // 从协调分析师的回复文本中反序列化结构化结果
+            // 部分兼容模型即使启用 JsonObject 仍可能在 JSON 前后输出多余文本，
+            // 使用 LlmJsonExtractor 进行多层兜底解析（直接解析 → 剥离 markdown → Utf8JsonReader 精确定位）
+            var rawText = coordinatorMessage.Text ?? string.Empty;
             _logger.LogInformation(
-                "调用协调分析师，输入消息: {MessageCount}，输入文本总长度: {TextLength}",
-                messages.Count,
-                messages.Sum(message => message.Text?.Length ?? 0));
+                "准备解析协调分析师最后一条 Assistant 消息，文本长度: {TextLength}，Content 类型: [{ContentTypes}]",
+                rawText.Length,
+                string.Join(", ", coordinatorMessage.Contents.Select(content => content.GetType().Name)));
+            _logger.LogDebug(
+                "协调分析师最后一条 Assistant 消息预览: {Preview}",
+                CreatePreview(rawText));
 
-            // 修复重试循环：解析/校验失败时将错误清单反馈给模型（同一对话上下文）重试，
-            // 仍失败则分层降级（null 硬伤抛异常，值违规钳制后接受），避免作废整个分析流程。
-            CoordinatorResult? coordinatorResult = null;
-            ChatMessage? coordinatorMessage = null;
-            var validationErrors = new List<string>();
-            var parseFailed = false;
+            // 解析与校验错误统一收集，供修复反馈与最终降级决策使用；
+            // 每轮重置，确保状态仅来自最近一次模型输出
+            coordinatorResult = null;
+            parseFailed = false;
+            validationErrors = [];
 
-            for (var attempt = 1; attempt <= MaxAttempts; attempt++)
+            try
             {
-                // 使用带结构化输出的 ChatClientAgent 运行。
-                // session: null — 无状态一次性调用，无需会话累积。
-                var startedAt = Stopwatch.GetTimestamp();
-                var agentResponse = await _coordinatorAgent.RunAsync(
-                    messages,
-                    session: null,
-                    options: null,
-                    cancellationToken);
-                var elapsed = Stopwatch.GetElapsedTime(startedAt);
+                coordinatorResult = LlmJsonExtractor.Deserialize<CoordinatorResult>(rawText, JsonOptions);
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogError(jsonEx,
+                    "协调分析师 JSON 解析失败，原始文本长度: {TextLength}，前 500 字符: {Preview}",
+                    rawText.Length,
+                    CreatePreview(rawText));
+                parseFailed = true;
+                // 反馈给模型的是缺字段等真实原因（InnerException）；包装层的
+                // "无法解析为 JSON + 500 字符原文预览"等于把模型自己的垃圾回显给它。
+                validationErrors.Add($"JSON 解析失败: {(jsonEx.InnerException ?? jsonEx).Message}");
+            }
 
-                _logger.LogInformation(
-                    "协调分析师调用完成（第 {Attempt}/{MaxAttempts} 次），耗时: {ElapsedMs} ms，响应消息: {MessageCount}，聚合文本长度: {TextLength}",
+            if (coordinatorResult == null && !parseFailed)
+            {
+                _logger.LogError(
+                    "协调分析师结构化解析结果为空，最后一条 Assistant 文本长度: {TextLength}，响应总消息数: {MessageCount}",
+                    rawText.Length,
+                    agentResponse.Messages.Count);
+                parseFailed = true;
+                validationErrors.Add("结构化输出为空");
+            }
+
+            if (coordinatorResult != null)
+            {
+                validationErrors.AddRange(StructuredOutputValidator.Validate(coordinatorResult));
+            }
+
+            if (validationErrors.Count == 0)
+            {
+                break;
+            }
+
+            if (attempt < MaxAttempts)
+            {
+                _logger.LogWarning(
+                    "协调分析师第 {Attempt}/{MaxAttempts} 次返回未通过校验，发起修复重试: {Errors}",
                     attempt,
                     MaxAttempts,
-                    elapsed.TotalMilliseconds,
-                    agentResponse.Messages.Count,
-                    agentResponse.Text?.Length ?? 0);
-                LogMessageDiagnostics("协调分析师原始响应", agentResponse.Messages);
-
-                // 提取协调分析师的回复（最后一条 Assistant 消息）
-                coordinatorMessage = agentResponse.Messages
-                    .LastOrDefault(m => m.Role == ChatRole.Assistant);
-
-                if (coordinatorMessage == null)
-                {
-                    throw new InvalidOperationException("协调分析师未能生成报告");
-                }
-
-                // 从协调分析师的回复文本中反序列化结构化结果
-                // 部分兼容模型即使启用 JsonObject 仍可能在 JSON 前后输出多余文本，
-                // 使用 LlmJsonExtractor 进行多层兜底解析（直接解析 → 剥离 markdown → Utf8JsonReader 精确定位）
-                var rawText = coordinatorMessage.Text ?? string.Empty;
-                _logger.LogInformation(
-                    "准备解析协调分析师最后一条 Assistant 消息，文本长度: {TextLength}，Content 类型: [{ContentTypes}]",
-                    rawText.Length,
-                    string.Join(", ", coordinatorMessage.Contents.Select(content => content.GetType().Name)));
-                _logger.LogDebug(
-                    "协调分析师最后一条 Assistant 消息预览: {Preview}",
-                    CreatePreview(rawText));
-
-                // 解析与校验错误统一收集，供修复反馈与最终降级决策使用；
-                // 每轮重置，确保状态仅来自最近一次模型输出
-                coordinatorResult = null;
-                parseFailed = false;
-                validationErrors = [];
-
-                try
-                {
-                    coordinatorResult = LlmJsonExtractor.Deserialize<CoordinatorResult>(rawText, JsonOptions);
-                }
-                catch (JsonException jsonEx)
-                {
-                    _logger.LogError(jsonEx,
-                        "协调分析师 JSON 解析失败，原始文本长度: {TextLength}，前 500 字符: {Preview}",
-                        rawText.Length,
-                        CreatePreview(rawText));
-                    parseFailed = true;
-                    validationErrors.Add($"JSON 解析失败: {jsonEx.Message}");
-                }
-
-                if (coordinatorResult == null && !parseFailed)
-                {
-                    _logger.LogError(
-                        "协调分析师结构化解析结果为空，最后一条 Assistant 文本长度: {TextLength}，响应总消息数: {MessageCount}",
-                        rawText.Length,
-                        agentResponse.Messages.Count);
-                    parseFailed = true;
-                    validationErrors.Add("结构化输出为空");
-                }
-
-                if (coordinatorResult != null)
-                {
-                    validationErrors.AddRange(StructuredOutputValidator.Validate(coordinatorResult));
-                }
-
-                if (validationErrors.Count == 0)
-                {
-                    break;
-                }
-
-                if (attempt < MaxAttempts)
-                {
-                    _logger.LogWarning(
-                        "协调分析师第 {Attempt}/{MaxAttempts} 次返回未通过校验，发起修复重试: {Errors}",
-                        attempt,
-                        MaxAttempts,
-                        string.Join("; ", validationErrors));
-                    messages = [.. messages, coordinatorMessage,
-                        new ChatMessage(ChatRole.User, BuildRepairFeedback(rawText, validationErrors, parseFailed))];
-                }
-            }
-
-            if (validationErrors.Count > 0)
-            {
-                // 解析失败或 null 类硬伤：结果不可用，或下游（卡片解析/ViewModel）假设属性非空，保持失败
-                if (coordinatorResult == null ||
-                    validationErrors.Any(error => error.Contains(NullViolationMarker, StringComparison.Ordinal)))
-                {
-                    throw new InvalidOperationException(
-                        $"协调分析师返回的数据不符合约束: {string.Join("; ", validationErrors)}");
-                }
-
-                // 降级接受：值违规（越界/长度/数量/枚举）不作废整个分析流程，钳制数值字段后继续
-                _logger.LogWarning(
-                    "协调分析师结果经 {MaxAttempts} 次调用仍未通过校验，降级接受: {Errors}",
-                    MaxAttempts,
                     string.Join("; ", validationErrors));
-                ClampNumericScores(coordinatorResult);
+                // 携带首轮完整消息（含工具调用与结果）而非仅最后一条文本：重试所见与工具闸门一致，
+                // 模型也能基于已取到的数据直接修正结论，不必重新取数。
+                messages = [.. messages, .. agentResponse.Messages,
+                    new ChatMessage(ChatRole.User, BuildRepairFeedback(rawText, validationErrors, parseFailed))
+                    { AdditionalProperties = new() { [MarketAssistant.Agents.Analysts.AIAgentToolDrivenOutput.RepairFeedbackKey] = true } }];
+            }
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            // 解析失败或 null 类硬伤：结果不可用，或下游（卡片解析/ViewModel）假设属性非空，保持失败
+            if (coordinatorResult == null ||
+                validationErrors.Any(error => error.Contains(NullViolationMarker, StringComparison.Ordinal)))
+            {
+                throw new InvalidOperationException(
+                    $"协调分析师返回的数据不符合约束: {string.Join("; ", validationErrors)}");
             }
 
-            _logger.LogInformation(
-                "成功获取协调分析师的结构化数据，综合评分: {Score}，最终评级: {Rating}",
-                coordinatorResult!.OverallScore,
-                coordinatorResult.InvestmentRating);
-
-            // 创建最终报告
-            // 仅保存过滤后的分析师消息（不含工具调用细节），避免归档时序列化 FunctionResultContent 失败。
-            // 协调对话内使用摘要以省 Token（P1-07），但报告/聊天/导出面向用户，
-            // 需从产物存储还原全文，保证展示的是分析师完整结论而非内部摘要指令；
-            // 系统说明（SystemNotice）与落盘失败的条目在回填时分别被跳过或保留原文。
-            var reportAnalystMessages = await RehydrateAnalystArtifactsAsync(filteredMessages, cancellationToken);
-
-            // 提取各分析师的机器可读信号（M3 回测/绩效统计的数据基础）：
-            // 单项解析失败仅缺失该分析师信号，不阻断报告生成
-            var analystSignals = AnalystSignalParser.ExtractSignals(reportAnalystMessages);
-            _logger.LogInformation(
-                "分析师信号提取完成，有效信号: {SignalCount}/{MessageCount}",
-                analystSignals.Count, reportAnalystMessages.Count);
-
-            var finalReport = new MarketAnalysisReport
-            {
-                AssetSymbol = assetSymbol,
-                MarketType = _marketType,
-                AnalystMessages = [.. reportAnalystMessages, coordinatorMessage!],
-                CoordinatorResult = coordinatorResult,
-                AnalystSignals = analystSignals,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _logger.LogInformation("协调分析师已完成最终报告生成，标的: {AssetSymbol}",
-                assetSymbol);
-
-            // 显式将报告推入工作流输出队列。
-            // WithOutputFrom 的 auto-yield 在 RunStreamingAsync（流式执行）路径下
-            // 存在时序缺陷：WatchStreamAsync 的 IAsyncEnumerable 在 auto-yield 入队前
-            // 已结束迭代，导致 WorkflowOutputEvent 丢失。显式调用 YieldOutputAsync
-            // 确保事件在 Executor 返回前入队，对非流式路径无副作用。
-            await context.YieldOutputAsync(finalReport, cancellationToken);
-
-            return finalReport;
+            // 降级接受：值违规（越界/长度/数量/枚举）不作废整个分析流程，钳制数值字段后继续
+            _logger.LogWarning(
+                "协调分析师结果经 {MaxAttempts} 次调用仍未通过校验，降级接受: {Errors}",
+                MaxAttempts,
+                string.Join("; ", validationErrors));
+            ClampNumericScores(coordinatorResult);
         }
-        catch (Exception ex)
+
+        // 循环内 break/降级路径均保证产出非空结果，显式收窄代替 null-forgiving
+        if (coordinatorResult is null || coordinatorMessage is null)
+            throw new InvalidOperationException("协调分析流程未产出结构化结果");
+
+        _logger.LogInformation(
+            "成功获取协调分析师的结构化数据，综合评分: {Score}，最终评级: {Rating}",
+            coordinatorResult.OverallScore,
+            coordinatorResult.InvestmentRating);
+
+        // 创建最终报告
+        // 仅保存过滤后的分析师消息（不含工具调用细节），避免归档时序列化 FunctionResultContent 失败。
+        // 协调对话内使用摘要以省 Token（P1-07），但报告/聊天/导出面向用户，
+        // 需从产物存储还原全文，保证展示的是分析师完整结论而非内部摘要指令；
+        // 系统说明（SystemNotice）与落盘失败的条目在回填时分别被跳过或保留原文。
+        var reportAnalystMessages = await RehydrateAnalystArtifactsAsync(filteredMessages, cancellationToken);
+
+        // 提取各分析师的机器可读信号（M3 回测/绩效统计的数据基础）：
+        // 单项解析失败仅缺失该分析师信号，不阻断报告生成
+        var analystSignals = AnalystSignalParser.ExtractSignals(reportAnalystMessages);
+        _logger.LogInformation(
+            "分析师信号提取完成，有效信号: {SignalCount}/{MessageCount}",
+            analystSignals.Count, reportAnalystMessages.Count);
+
+        var finalReport = new MarketAnalysisReport
         {
-            _logger.LogError(ex, "协调分析师生成报告时发生错误，标的: {AssetSymbol}",
-                await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, WorkflowStateKeys.Scope, cancellationToken) ?? "未知");
-            throw;
-        }
+            AssetSymbol = assetSymbol,
+            MarketType = _marketType,
+            AnalystMessages = [.. reportAnalystMessages, coordinatorMessage],
+            CoordinatorResult = coordinatorResult,
+            AnalystSignals = analystSignals,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _logger.LogInformation("协调分析师已完成最终报告生成，标的: {AssetSymbol}",
+            assetSymbol);
+
+        // 显式将报告推入工作流输出队列。
+        // WithOutputFrom 的 auto-yield 在 RunStreamingAsync（流式执行）路径下
+        // 存在时序缺陷：WatchStreamAsync 的 IAsyncEnumerable 在 auto-yield 入队前
+        // 已结束迭代，导致 WorkflowOutputEvent 丢失。显式调用 YieldOutputAsync
+        // 确保事件在 Executor 返回前入队，对非流式路径无副作用。
+        await context.YieldOutputAsync(finalReport, cancellationToken);
+
+        return finalReport;
     }
 
     /// <summary>
@@ -345,11 +372,7 @@ public sealed partial class CoordinatorExecutor(
         {
             return await _artifactStore.GetAsync(_runId, analystName, cancellationToken);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "读取分析师产物失败，保留摘要消息: Run: {RunId}, Analyst: {Analyst}",
                 _runId.ToString("N"), analystName);
@@ -416,7 +439,6 @@ public sealed partial class CoordinatorExecutor(
         for (var index = 0; index < messageList.Count; index++)
         {
             var message = messageList[index];
-            var text = message.Text ?? string.Empty;
             var contentTypes = string.Join(", ", message.Contents.Select(content => content.GetType().Name));
             _logger.LogInformation(
                 "{Stage} [{Index}/{Count}] Role: {Role}, Author: {Author}, TextLength: {TextLength}, ContentTypes: [{ContentTypes}]",
@@ -425,14 +447,14 @@ public sealed partial class CoordinatorExecutor(
                 messageList.Count,
                 message.Role,
                 message.AuthorName ?? "null",
-                text.Length,
+                message.Text?.Length ?? 0,
                 contentTypes);
             _logger.LogDebug(
                 "{Stage} [{Index}/{Count}] 文本预览: {Preview}",
                 stage,
                 index + 1,
                 messageList.Count,
-                CreatePreview(text));
+                CreatePreview(message.Text));
         }
     }
 

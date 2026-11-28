@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1200"
+             x:Class="MarketAssistant.Views.Components.IndexTickerBarView"
+             x:DataType="vm:IndexTickerBarViewModel">
+
+    <!-- 首页行情条：归属首页首行，独占整行宽度。
+         UniformGrid Rows=1 + Stretch 让各指数均分整行宽度，避免聚在中间。 -->
+    <ItemsControl ItemsSource="{Binding IndexTickers}"
+                  IsVisible="{Binding HasIndexTickers}"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Center">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <UniformGrid Rows="1"/>
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:IndexTickerItemViewModel">
+                <!-- 单项居中于自己的等分列，整体横向铺满 -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{StaticResource TinySpacing}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Price}"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               FontWeight="{DynamicResource WeightNumber}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding ChangeText}"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsUp}"
+                               Foreground="{StaticResource BullishBrush}"/>
+                    <TextBlock Text="{Binding ChangeText}"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsDown}"
+                               Foreground="{StaticResource BearishBrush}"/>
+                    <TextBlock Text="{Binding ChangeText}"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsNeutral}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

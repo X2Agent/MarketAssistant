@@ -30,11 +30,12 @@ public sealed class TradeExecutorConcurrencyTest
                 OrderId = "1001",
                 Status = "FILLED",
                 ExecutedQty = 0.6m,
+                Price = 100m,
                 RequestedQty = 0.6m
             });
 
         // 风控直接放行：模拟两笔卖出都基于同一持仓快照在锁外通过了风控（旧 A2 竞态前提）
-        var riskManager = new Mock<RiskManager>(null!, null!, null!, null!, null!, NullLogger<RiskManager>.Instance);
+        var riskManager = new Mock<RiskManager>(null!, null!, null!, null!, null!, NullLogger<RiskManager>.Instance, null!, null!);
         riskManager
             .Setup(manager => manager.ValidateOrderAsync(
                 It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<decimal>(),
@@ -67,6 +68,7 @@ public sealed class TradeExecutorConcurrencyTest
             dataService.Object,
             NullLogger<TradeExecutor>.Instance);
 
+        using var ledger = new OrderLedgerFixture(dataService);
         var first = executor.ExecuteOrderAsync("BTCUSDT", OrderSide.Sell, OrderType.Market, 0.6m, 100m);
         var second = executor.ExecuteOrderAsync("BTCUSDT", OrderSide.Sell, OrderType.Market, 0.6m, 100m);
         var results = await Task.WhenAll(first, second);
@@ -126,7 +128,7 @@ public sealed class TradeExecutorConcurrencyTest
             exchangeClient.Object,
             new TradingHaltState(dataService.Object, NullLogger<TradingHaltState>.Instance),
             new ApiHealthMonitor(),
-            NullLogger<RiskManager>.Instance);
+            NullLogger<RiskManager>.Instance, null!, null!);
 
         var result = await riskManager.ValidateOrderAsync(
             "UNKNOWNQUOTE", OrderSide.Sell, 0.1m, 100m, OrderType.Market);
@@ -182,7 +184,7 @@ public sealed class TradeExecutorConcurrencyTest
             exchangeClient.Object,
             new TradingHaltState(dataService.Object, NullLogger<TradingHaltState>.Instance),
             new ApiHealthMonitor(),
-            NullLogger<RiskManager>.Instance);
+            NullLogger<RiskManager>.Instance, null!, null!);
 
         // 现有空头敞口 2900 USDT (290%)，再卖出开空 200 USDT 将超 300% 上限
         var openShortResult = await riskManager.ValidateOrderAsync(
@@ -223,7 +225,7 @@ public sealed class TradeExecutorConcurrencyTest
                 Price = 101m
             });
 
-        var riskManager = new Mock<RiskManager>(null!, null!, null!, null!, null!, NullLogger<RiskManager>.Instance);
+        var riskManager = new Mock<RiskManager>(null!, null!, null!, null!, null!, NullLogger<RiskManager>.Instance, null!, null!);
         riskManager
             .Setup(manager => manager.ValidateOrderAsync(
                 It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<decimal>(),
@@ -259,8 +261,10 @@ public sealed class TradeExecutorConcurrencyTest
             dataService.Object,
             NullLogger<TradeExecutor>.Instance);
 
+        using var ledger = new OrderLedgerFixture(dataService);
         var result = await executor.ExecuteOrderAsync(
             "BTCUSDT", OrderSide.Sell, OrderType.Market, 0.5m, 100m);
+        persisted = (await ledger.Records.GetTradeRecordsAsync()).Single();
 
         Assert.IsTrue(result.Success, "市价卖出应成交成功");
         Assert.IsNotNull(persisted, "成交记录必须落库");

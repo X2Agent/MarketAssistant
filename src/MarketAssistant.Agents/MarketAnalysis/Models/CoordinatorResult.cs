@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using MarketAssistant.Infrastructure.Extensions;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Models;
 
@@ -47,6 +48,21 @@ public sealed class CoordinatorResult
     [MaxLength(50)]
     [Description("投资时间维度的补充说明，例如：'中期 6-12 个月'")]
     public string TimeHorizonDescription { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 投资期限的展示文本。补充说明已带期限词（提示词里的示例写法就是「中期 6-12 个月」）时原样使用，
+    /// 否则在前面补上期限词。页面、导出、聊天卡片统一用它，避免各处自行拼接出「中期 (中期 6-12 个月)」。
+    /// </summary>
+    public string DescribeTimeHorizon()
+    {
+        var label = TimeHorizon.GetDescription();
+        if (string.IsNullOrWhiteSpace(TimeHorizonDescription))
+            return label;
+
+        return TimeHorizonDescription.Contains(label, StringComparison.Ordinal)
+            ? TimeHorizonDescription
+            : $"{label} ({TimeHorizonDescription})";
+    }
 
     [Description("综合风险等级")]
     public Level RiskLevel { get; set; }

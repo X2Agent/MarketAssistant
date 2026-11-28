@@ -8,7 +8,7 @@ namespace MarketAssistant.Applications.AlertCenter;
 /// <see cref="AlertSuppressionPolicy"/> 与 <see cref="AlertCenterService"/> 统一判定，
 /// 通道不重复实现，也不得绕过它们直接推送。
 /// 实现必须自行隔离异常——单通道失败只记录日志，不得影响告警主链与其它通道。
-/// </summary>
+/// </remarks>
 public interface IAlertChannel
 {
     /// <summary>通道名称（日志与测试推送用）。</summary>

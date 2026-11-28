@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.DataProviders;
 using MarketAssistant.Infrastructure.Extensions;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +21,7 @@ public sealed class CryptoSentimentTools(
 
     public async Task<FundingRateHistory> GetFundingRateAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取资金费率数据", symbol, _logger, async _ =>
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
@@ -69,12 +70,7 @@ public sealed class CryptoSentimentTools(
                 AverageRate = averageRate,
                 History = historyPoints
             };
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取资金费率历史数据时发生错误: {Symbol}", symbol);
-            throw new FriendlyException($"获取资金费率数据失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     public async Task<LongShortRatioHistory> GetGlobalLongShortRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default)
@@ -124,7 +120,7 @@ public sealed class CryptoSentimentTools(
         string dataType,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync($"获取{dataType}", symbol, _logger, async _ =>
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
@@ -172,17 +168,12 @@ public sealed class CryptoSentimentTools(
                 AverageRatio = averageRatio,
                 History = historyPoints
             };
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取{DataType}时发生错误: {Symbol}", dataType, symbol);
-            throw new FriendlyException($"获取{dataType}失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     public async Task<OpenInterest> GetOpenInterestAsync(string symbol, Period period = Period.OneHour, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取合约持仓量", symbol, _logger, async _ =>
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
@@ -230,12 +221,7 @@ public sealed class CryptoSentimentTools(
                 AverageOpenInterestValue = avgOpenInterestValue,
                 History = historyPoints
             };
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取合约持仓量时发生错误: {Symbol}", symbol);
-            throw new FriendlyException($"获取合约持仓量失败: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     public IEnumerable<AIFunction> GetFunctions()

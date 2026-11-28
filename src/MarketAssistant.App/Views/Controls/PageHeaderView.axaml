@@ -1,0 +1,43 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MarketAssistant.Views.Controls">
+
+    <!-- ================================================================== -->
+    <!-- PageHeaderView — 标题 24 + 行内说明 12 + 右侧操作槽                          -->
+    <!--                                                                             -->
+    <!-- 只在操作槽里有真实操作时使用：自选页（「卡片视图 / 表格视图」切换）、            -->
+    <!-- AI 选股/选币结果头（「新的选股」）。                                         -->
+    <!-- 其它页面不再写页头——根页面标题由左侧导航表达，二级页面标题由返回窄条表达。     -->
+    <!-- 说明与标题同行，窄窗下 TextTrimming 截断，不出现两行页头。                     -->
+    <!-- 排版属性与 TextStyles 的 title / caption 同令牌，保持视觉一致。                 -->
+    <!-- ================================================================== -->
+    <Style Selector="controls|PageHeaderView">
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:PageHeaderView">
+                <Grid ColumnDefinitions="Auto,*,Auto"
+                      VerticalAlignment="Center"
+                      Margin="{StaticResource NoMargin}">
+                    <TextBlock Grid.Column="0"
+                               Text="{TemplateBinding Title}"
+                               FontSize="{StaticResource TitleFontSize}"
+                               FontWeight="{DynamicResource WeightTitle}"
+                               LineHeight="{StaticResource TitleLineHeight}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{TemplateBinding Description}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               FontWeight="{DynamicResource WeightBody}"
+                               LineHeight="{StaticResource CaptionLineHeight}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="{StaticResource SmallLeftMargin}"/>
+                    <ContentPresenter Grid.Column="2"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      VerticalAlignment="Center"/>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+</Styles>

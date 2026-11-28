@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Charts.Models;
-using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Applications.PriceAlert;
 
@@ -165,6 +164,25 @@ public partial class PriceAlertRule : ObservableObject
     public bool IsIndicatorCondition => Condition is not (
         AlertCondition.PriceAbove or AlertCondition.PriceBelow
         or AlertCondition.ChangePercentAbove or AlertCondition.ChangePercentBelow);
+
+    /// <summary>条件指向上行（涨破 / 金叉 / 超买 / 上轨突破等），列表按"红涨"着色。量比无方向，两者皆为 false。</summary>
+    public bool IsUpwardCondition => Condition is AlertCondition.PriceAbove or AlertCondition.ChangePercentAbove
+        or AlertCondition.RsiAbove or AlertCondition.BollUpperBreak
+        or AlertCondition.MacdGoldenCross or AlertCondition.KdjGoldenCross or AlertCondition.MaGoldenCross;
+
+    /// <summary>条件指向下行（跌破 / 死叉 / 超卖 / 下轨跌破等），列表按"绿跌"着色。</summary>
+    public bool IsDownwardCondition => Condition is AlertCondition.PriceBelow or AlertCondition.ChangePercentBelow
+        or AlertCondition.RsiBelow or AlertCondition.BollLowerBreak
+        or AlertCondition.MacdDeadCross or AlertCondition.KdjDeadCross or AlertCondition.MaDeadCross;
+
+    /// <summary>条件目标值的展示文本；金叉 / 死叉 / 布林突破没有目标值，返回空字符串。</summary>
+    public string ConditionValueText => Condition switch
+    {
+        AlertCondition.PriceAbove or AlertCondition.PriceBelow => TargetPrice.ToString("#,##0.########"),
+        AlertCondition.ChangePercentAbove or AlertCondition.ChangePercentBelow => $"{TargetPrice:0.##}%",
+        AlertCondition.VolumeRatioAbove or AlertCondition.RsiAbove or AlertCondition.RsiBelow => TargetPrice.ToString("0.##"),
+        _ => string.Empty
+    };
 
     /// <summary>
     /// 是否自选股批量规则在某符号下的运行时副本。副本不向 UI 回写单一符号的行情

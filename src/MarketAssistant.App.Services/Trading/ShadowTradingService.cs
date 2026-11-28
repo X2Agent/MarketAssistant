@@ -28,7 +28,7 @@ public sealed record ShadowTrade(
 /// 本服务按与实盘一致的口径记账：开仓记零盈亏，平仓按 FIFO 结算并扣除手续费，
 /// 使影子绩效可以与实盘绩效直接对比。
 /// </remarks>
-public sealed class ShadowTradingService(
+public class ShadowTradingService(
     TradingDataService dataService,
     ILogger<ShadowTradingService> logger)
 {
@@ -119,7 +119,8 @@ public sealed class ShadowTradingService(
         => LoadOpenPositionsAsync(strategyId, symbol, OrderSide.Buy, ct);
 
     /// <summary>查询影子流水（按环境、策略/标的过滤）。</summary>
-    public async Task<List<ShadowTrade>> LoadAsync(
+    /// <remarks>virtual 供绩效统计的异常传播测试替换。</remarks>
+    public virtual async Task<List<ShadowTrade>> LoadAsync(
         string? strategyId = null, string? symbol = null, CancellationToken ct = default)
     {
         var conditions = new List<string> { "environment = @environment" };

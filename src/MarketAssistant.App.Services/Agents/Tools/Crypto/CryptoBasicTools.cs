@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -19,10 +20,10 @@ public sealed class CryptoBasicTools(
     CoinGeckoApiService coinGeckoService,
     IUserSettingService userSettingService) : IBasicDataTools
 {
-    private readonly ILogger<CryptoBasicTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<CryptoBasicTools> _logger = logger;
+    private readonly BinanceMarketDataService _binanceService = binanceService;
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService;
+    private readonly IUserSettingService _userSettingService = userSettingService;
 
     /// <summary>
     /// 根据资产代码获取基本数据（使用币安 API 获取 24 小时行情统计）
@@ -32,7 +33,7 @@ public sealed class CryptoBasicTools(
     [Description("根据虚拟币代码获取基本数据，包括实时行情、价格变动、成交量等信息。symbol格式不区分大小写，如BTC或BTCUSDT。")]
     public async Task<CryptoQuoteInfo> GetAssetInfoAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取虚拟币行情", assetSymbol, _logger, async _ =>
         {
             // 格式化交易对符号（如 "BTC" -> "BTCUSDT"）
             var symbol = ToBinanceFormat(assetSymbol);
@@ -77,17 +78,7 @@ public sealed class CryptoBasicTools(
                 assetSymbol, quoteInfo.CurrentPrice, quoteInfo.PercentageChange);
 
             return quoteInfo;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "调用币安API获取行情失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"获取虚拟币行情失败: {assetSymbol}，请检查网络连接或交易对是否正确", ex);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取虚拟币行情时发生错误: {Symbol}", assetSymbol);
-            throw new FriendlyException($"获取虚拟币行情时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -111,7 +102,7 @@ public sealed class CryptoBasicTools(
     [Description("根据虚拟币代码获取区块链项目基本面信息，包括项目简介、社区数据、开发者活跃度等。symbol格式不区分大小写，如BTC。")]
     public async Task<CryptoProjectInfo> GetProjectInfoAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取虚拟币项目信息", assetSymbol, _logger, async _ =>
         {
             // 提取基础币种 (如 BTCUSDT -> BTC)
             var baseSymbol = CryptoSymbolConverter.ExtractBaseCurrency(assetSymbol);
@@ -154,17 +145,7 @@ public sealed class CryptoBasicTools(
             _logger.LogInformation("成功获取虚拟币项目信息: {Name} ({Symbol})", projectInfo.Name, symbol);
 
             return projectInfo;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "调用 CoinGecko API 获取项目信息失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"获取虚拟币项目信息失败: {assetSymbol}，请检查网络连接", ex);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取虚拟币项目信息时发生错误: {Symbol}", assetSymbol);
-            throw new FriendlyException($"获取虚拟币项目信息时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>

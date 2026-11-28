@@ -135,7 +135,14 @@ public static class CryptoSymbolConverter
             return false;
         }
 
-        return CoinGeckoIdMapping.TryGetValue(baseSymbol.Trim().ToLowerInvariant(), out coinId!);
+        if (CoinGeckoIdMapping.TryGetValue(baseSymbol.Trim().ToLowerInvariant(), out var mapped))
+        {
+            coinId = mapped;
+            return true;
+        }
+
+        coinId = string.Empty;
+        return false;
     }
 
     /// <summary>

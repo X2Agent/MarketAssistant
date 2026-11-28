@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Applications.InvestmentSelection.Models;
 
@@ -10,9 +11,9 @@ namespace MarketAssistant.Applications.InvestmentSelection.Models;
 public class InvestmentRecommendation
 {
     /// <summary>
-    /// 资产代码（股票如 SH600000，虚拟币如 BTC/USDT）
+    /// 资产代码，原样使用候选数据中的代码（股票如 SH600000，虚拟币如 BTC）
     /// </summary>
-    [Description("资产代码，格式：股票如 SH600000、SZ000001，虚拟币如 BTC/USDT、ETH/USDT")]
+    [Description("资产代码，必须原样使用候选数据中的代码字段，不得改写或追加后缀：股票如 SH600000、SZ000001，虚拟币如 BTC、ETH")]
     public string Symbol { get; set; } = string.Empty;
 
     /// <summary>
@@ -66,15 +67,27 @@ public class InvestmentRecommendation
     /// <summary>
     /// 目标价格
     /// </summary>
-    [Range(0.01, 100000000)]
-    [Description("目标价格，单位：元或USDT，范围0.01-100000000，无法预测时设为null")]
+    [Range(0.00000001, 100000000)]
+    [Description("目标价格，单位：元或USDT，范围0.00000001-100000000，低价币需保留足够小数位，无法预测时设为null")]
     public decimal? TargetPrice { get; set; }
 
     /// <summary>
     /// 止损价格
     /// </summary>
-    [Range(0.01, 100000000)]
-    [Description("止损价格，单位：元或USDT，范围0.01-100000000，无法预测时设为null")]
+    [Range(0.00000001, 100000000)]
+    [Description("止损价格，单位：元或USDT，范围0.00000001-100000000，低价币需保留足够小数位，无法预测时设为null")]
     public decimal? StopLoss { get; set; }
+
+    /// <summary>
+    /// 筛选快照中的现价，仅供界面与目标价/止损价对照；由 Executor 回填，不属于 LLM 输出契约
+    /// </summary>
+    [JsonIgnore]
+    public decimal? CurrentPrice { get; set; }
+
+    /// <summary>
+    /// 筛选快照中的涨跌幅(%)，仅供界面展示；由 Executor 回填，不属于 LLM 输出契约
+    /// </summary>
+    [JsonIgnore]
+    public decimal? ChangePercent { get; set; }
 }
 

@@ -3,120 +3,106 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
              mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="360"
              x:Class="MarketAssistant.Views.Components.ProgressDisplayView"
              x:Name="Root">
 
     <UserControl.Styles>
-        <!-- 运行中分析师的呼吸点 -->
-        <Style Selector="Ellipse.PulseDot">
-            <Style.Animations>
-                <Animation Duration="0:0:1.2" IterationCount="Infinite">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="0.35"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="50%">
-                        <Setter Property="Opacity" Value="1"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Opacity" Value="0.35"/>
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
         <!-- 步骤条：未激活 -->
         <Style Selector="Border.phaseStep">
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+            <Setter Property="Padding" Value="{StaticResource ChipPadding}"/>
         </Style>
         <Style Selector="Border.phaseStep TextBlock">
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         </Style>
         <!-- 步骤条：当前阶段高亮 -->
         <Style Selector="Border.phaseStep.active">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         </Style>
         <Style Selector="Border.phaseStep.active TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
         </Style>
-        <!-- 步骤条：已完成 -->
+        <!-- 步骤条：已完成。用强调浅底 + 强调色文字，不用 AccentHover 实底
+             （蓝字压深蓝底，对比度不足且与"当前"阶段抢注意力） -->
         <Style Selector="Border.phaseStep.done">
-            <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
         </Style>
         <Style Selector="Border.phaseStep.done TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
         </Style>
         <!-- 步骤间连接线 -->
         <Style Selector="Border.phaseLink">
             <Setter Property="Width" Value="14"/>
             <Setter Property="Height" Value="2"/>
-            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="Margin" Value="{StaticResource SmallHorizontalMargin}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
         </Style>
         <Style Selector="Border.phaseLink.done">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         </Style>
         <!-- 分析师状态行 -->
         <Style Selector="Border.analystRow">
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+            <Setter Property="Padding" Value="{StaticResource CompactButtonPadding}"/>
+            <Setter Property="Margin" Value="{StaticResource TinyVerticalMargin}"/>
         </Style>
     </UserControl.Styles>
     
     <Border Background="{DynamicResource CardBackgroundBrush}"
-            BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="{StaticResource DefaultBorderThickness}"
+            BorderThickness="{StaticResource NoBorderThickness}"
             CornerRadius="{StaticResource DefaultCornerRadius}"
             Padding="{StaticResource ProgressDialogPadding}"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
             Width="{StaticResource ProgressDialogWidth}">
         
-        <StackPanel Spacing="14">
+        <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
-            <!-- 标题 -->
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        Spacing="{StaticResource SmallSpacing}">
+            <!-- 标题 + 标的：等待期间始终能看到分析的是哪只标的 -->
+            <StackPanel HorizontalAlignment="Center"
+                        Spacing="{StaticResource TinySpacing}">
                 <TextBlock Text="AI 分析中..."
-                           FontSize="{StaticResource LargeFontSize}"
-                           FontWeight="Bold"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource PrimaryBrush}"/>
+                           FontSize="{StaticResource TitleFontSize}"
+                           FontWeight="{DynamicResource WeightTitle}"
+                           HorizontalAlignment="Center"
+                           Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="{Binding #Root.SubjectText}"
+                           FontSize="{StaticResource BodySmFontSize}"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           IsVisible="{Binding #Root.SubjectText,
+                               Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
 
-            <!-- 流程步骤条：准备 → 分析 → 聚合 → 报告 → 完成 -->
+            <!-- 流程步骤条：准备 → 分析 → 报告（聚合并入报告；完成态即全部步骤已完成，不单列一步） -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Border x:Name="PhaseStep0" Classes="phaseStep"><TextBlock Text="准备"/></Border>
                 <Border x:Name="PhaseLink0" Classes="phaseLink"/>
                 <Border x:Name="PhaseStep1" Classes="phaseStep"><TextBlock Text="分析"/></Border>
                 <Border x:Name="PhaseLink1" Classes="phaseLink"/>
-                <Border x:Name="PhaseStep2" Classes="phaseStep"><TextBlock Text="聚合"/></Border>
-                <Border x:Name="PhaseLink2" Classes="phaseLink"/>
-                <Border x:Name="PhaseStep3" Classes="phaseStep"><TextBlock Text="报告"/></Border>
-                <Border x:Name="PhaseLink3" Classes="phaseLink"/>
-                <Border x:Name="PhaseStep4" Classes="phaseStep"><TextBlock Text="完成"/></Border>
+                <Border x:Name="PhaseStep2" Classes="phaseStep"><TextBlock Text="报告"/></Border>
             </StackPanel>
 
             <!-- 大号百分比 + 进度条 -->
-            <StackPanel Spacing="6">
+            <StackPanel Spacing="{StaticResource SmallSpacing}">
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Center">
                     <TextBlock Text="{Binding #Root.ProgressPercent}"
-                               FontSize="36"
-                               FontWeight="Bold"
+                               FontSize="{StaticResource DisplayFontSize}"
+                               FontWeight="{DynamicResource WeightNumber}"
                                FontFamily="{StaticResource DataFontFamily}"
-                               Foreground="{StaticResource PrimaryBrush}"/>
+                               Foreground="{StaticResource AccentBrush}"/>
                     <TextBlock Text="%"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Margin="2,0,0,5"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightNumber}"
+                               Margin="{StaticResource TinyLeftMargin}"
                                VerticalAlignment="Bottom"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
@@ -124,56 +110,56 @@
                              Maximum="100"
                              Height="{StaticResource ProgressBarHeight}"
                              CornerRadius="{StaticResource TinyCornerRadius}"
-                             Foreground="{StaticResource PrimaryBrush}"
+                             Foreground="{StaticResource AccentBrush}"
                              Background="{DynamicResource SurfaceVariantBrush}"/>
             </StackPanel>
 
             <!-- 阶段说明 -->
             <TextBlock Text="{Binding #Root.AnalysisStage}"
-                       FontSize="{StaticResource LabelFontSize}"
-                       FontWeight="Medium"
+                       FontSize="{StaticResource BodySmFontSize}"
+                       FontWeight="{DynamicResource WeightEmphasis}"
                        HorizontalAlignment="Center"
                        TextWrapping="Wrap"
                        TextAlignment="Center"
                        Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-            <!-- 逐分析师状态行 -->
+            <!-- 逐分析师状态行：状态由左侧圆点表达，不再叠一个 ✓/✗ 字形 -->
             <ItemsControl ItemsSource="{Binding #Root.AnalystRunItems}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:AnalystRunItemViewModel">
                         <Border Classes="analystRow">
-                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-                                <Grid Grid.Column="0" Width="12" Height="12" VerticalAlignment="Center">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                <Grid Grid.Column="0" Width="{StaticResource IndicatorSize}" Height="{StaticResource IndicatorSize}" VerticalAlignment="Center">
                                     <!-- 运行中：呼吸点 -->
-                                    <Ellipse Width="9" Height="9"
-                                             Fill="{StaticResource PrimaryBrush}"
+                                    <Ellipse Width="{StaticResource StatusDotSize}" Height="{StaticResource StatusDotSize}"
+                                             Fill="{StaticResource AccentBrush}"
                                              Classes="PulseDot"
                                              IsVisible="{Binding IsRunning}"/>
                                     <!-- 等待：静默灰点 -->
-                                    <Ellipse Width="9" Height="9"
+                                    <Ellipse Width="{StaticResource StatusDotSize}" Height="{StaticResource StatusDotSize}"
                                              Fill="{DynamicResource TextSecondaryBrush}"
                                              Opacity="0.4"
                                              IsVisible="{Binding IsPending}"/>
                                     <!-- 完成：绿点 -->
-                                    <Ellipse Width="9" Height="9"
+                                    <Ellipse Width="{StaticResource StatusDotSize}" Height="{StaticResource StatusDotSize}"
                                              Fill="{DynamicResource SuccessBrush}"
                                              IsVisible="{Binding IsCompleted}"/>
                                     <!-- 失败：红点 -->
-                                    <Ellipse Width="9" Height="9"
+                                    <Ellipse Width="{StaticResource StatusDotSize}" Height="{StaticResource StatusDotSize}"
                                              Fill="{DynamicResource ErrorBrush}"
                                              IsVisible="{Binding IsFailed}"/>
                                 </Grid>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding DisplayName}"
-                                           Margin="8,0,0,0"
+                                           Margin="{StaticResource SmallLeftMargin}"
                                            VerticalAlignment="Center"
-                                           FontSize="{StaticResource SmallFontSize}"
+                                           FontSize="{StaticResource CaptionFontSize}"
                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 <TextBlock Grid.Column="2"
                                            Text="{Binding TokensText}"
                                            VerticalAlignment="Center"
-                                           Margin="0,0,8,0"
-                                           FontSize="{StaticResource MiniFontSize}"
+                                           Margin="{StaticResource SmallRightMargin}"
+                                           FontSize="{StaticResource CaptionFontSize}"
                                            FontFamily="{StaticResource DataFontFamily}"
                                            ToolTip.Tip="该分析师累计 Token 用量"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
@@ -181,18 +167,9 @@
                                 <TextBlock Grid.Column="3"
                                            Text="{Binding ElapsedText}"
                                            VerticalAlignment="Center"
-                                           FontSize="{StaticResource MiniFontSize}"
+                                           FontSize="{StaticResource CaptionFontSize}"
                                            FontFamily="{StaticResource DataFontFamily}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <TextBlock Grid.Column="4"
-                                           Text="{Binding StatusMark}"
-                                           Width="16"
-                                           TextAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Margin="6,0,0,0"
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           FontWeight="Bold"
-                                           IsVisible="{Binding IsCompleted}"/>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -205,40 +182,28 @@
                         IsVisible="{Binding #Root.UsageSummaryText,
                             Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Text="{Binding #Root.UsageSummaryText}"
-                           FontSize="{StaticResource SmallFontSize}"
-                           FontWeight="SemiBold"
+                           FontSize="{StaticResource CaptionFontSize}"
+                           FontWeight="{DynamicResource WeightTitle}"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                 <TextBlock Text="{Binding #Root.UsageDetailText}"
-                           FontSize="{StaticResource MiniFontSize}"
+                           FontSize="{StaticResource CaptionFontSize}"
                            FontFamily="{StaticResource DataFontFamily}"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
             </StackPanel>
 
             <!-- 失败分析师提示 -->
-            <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
-                    CornerRadius="{StaticResource SmallCornerRadius}"
-                    Padding="{StaticResource CompactCardPadding}"
-                    IsVisible="{Binding #Root.FailedAnalystsInfo, 
-                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Text="{Binding #Root.FailedAnalystsInfo}"
-                           FontSize="{StaticResource SmallFontSize}"
-                           Foreground="{DynamicResource DangerPanelTextBrush}"
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap"/>
-            </Border>
+            <controls:StatusBanner Severity="Danger"
+                                   Message="{Binding #Root.FailedAnalystsInfo}"
+                                   IsVisible="{Binding #Root.FailedAnalystsInfo,
+                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-            <!-- 取消按钮 -->
-            <StackPanel Spacing="{StaticResource SmallSpacing}">
-                <Button Content="取消分析"
-                        Command="{Binding #Root.CancelCommand}"
-                        HorizontalAlignment="Center"
-                        Background="Transparent"
-                        Foreground="{DynamicResource TextSecondaryBrush}"
-                        FontSize="{StaticResource SmallFontSize}"
-                        Padding="{StaticResource CompactCardPadding}"/>
-            </StackPanel>
+            <!-- 取消按钮：次要操作，不用强调色（强调色此刻是进度本身） -->
+            <Button Content="取消分析"
+                    Classes="btn-secondary btn-sm"
+                    Command="{Binding #Root.CancelCommand}"
+                    HorizontalAlignment="Center"/>
         </StackPanel>
     </Border>
 </UserControl>

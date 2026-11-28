@@ -1,9 +1,5 @@
-using System.Text;
-using System.Text.Json;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Trading.Models;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +16,7 @@ public sealed partial class AISignalStrategyExecutor(
     AnalysisReportCache reportCache,
     TradeExecutor tradeExecutor,
     ShadowTradingService shadowTradingService,
+    SignalAlertEvaluator signalAlertEvaluator,
     ILogger<AISignalStrategyExecutor> logger)
 {
     private readonly ITradingAgentFactory _agentFactory = agentFactory;
@@ -29,6 +26,7 @@ public sealed partial class AISignalStrategyExecutor(
     private readonly AnalysisReportCache _reportCache = reportCache;
     private readonly TradeExecutor _tradeExecutor = tradeExecutor;
     private readonly ShadowTradingService _shadowTradingService = shadowTradingService;
+    private readonly SignalAlertEvaluator _signalAlertEvaluator = signalAlertEvaluator;
     private readonly ILogger<AISignalStrategyExecutor> _logger = logger;
 
     public async Task<AISignalExecutionResult> ExecuteAsync(
@@ -36,18 +34,74 @@ public sealed partial class AISignalStrategyExecutor(
         decimal currentPrice,
         CancellationToken ct = default)
     {
-        if (TryHandleHardBoundary(strategy, currentPrice, out var boundaryReasoning))
+        AISignalParams? aiParams;
+        try
+        {
+            aiParams = AISignalParams.FromJson(strategy.CustomParams);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "AI 策略参数损坏，暂停策略: {StrategyId}", strategy.Id);
+            return await PauseForInvalidConfigurationAsync(
+                strategy, "AI 策略参数 JSON 损坏", ct).ConfigureAwait(false);
+        }
+
+        if (aiParams == null)
+        {
+            _logger.LogError("AI 策略缺少参数，暂停策略: {StrategyId}", strategy.Id);
+            return await PauseForInvalidConfigurationAsync(
+                strategy, "AI 策略缺少参数", ct).ConfigureAwait(false);
+        }
+
+        // 持仓方向以本地账本为准（按 StrategyId 精确归属），而不是 strategy.Side：
+        // AI 决策方向驱动下单方向后，同一策略可以先开多再开空（合约），
+        // strategy.Side 只是创建时的初始方向，不再可靠。无持仓记录时按 Side 兜底。
+        var isLongPosition = await ResolveIsLongPositionAsync(strategy, ct).ConfigureAwait(false);
+
+        if (TryHandleHardBoundary(strategy, currentPrice, isLongPosition, out var boundaryReasoning))
         {
             // 影子模式下硬性边界也只记账不下单：影子策略全程不得触达交易所
-            var shadowParams = AISignalParams.FromJson(strategy.CustomParams);
-            if (shadowParams?.ShadowMode == true)
+            if (aiParams.ShadowMode)
                 return await RecordShadowExitAsync(strategy, currentPrice, boundaryReasoning, ct).ConfigureAwait(false);
 
-            return await ExecuteHardBoundaryAsync(strategy, currentPrice, boundaryReasoning, ct)
+            return await ExecuteHardBoundaryAsync(strategy, currentPrice, isLongPosition, boundaryReasoning, ct)
                 .ConfigureAwait(false);
         }
 
-        return await ExecuteWithAgentAsync(strategy, currentPrice, ct).ConfigureAwait(false);
+        return await ExecuteWithAgentAsync(strategy, currentPrice, aiParams, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 配置无效属于确定性失败：暂停策略并告警一次，避免普通冷却后周期性重复执行。
+    /// </summary>
+    private async Task<AISignalExecutionResult> PauseForInvalidConfigurationAsync(
+        TradingStrategy strategy, string reason, CancellationToken ct)
+    {
+        await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, ct)
+            .ConfigureAwait(false);
+        await _signalAlertEvaluator.NotifyStrategyConfigurationPausedSafeAsync(strategy, reason)
+            .ConfigureAwait(false);
+        return AISignalExecutionResult.ConfigurationFailed(reason);
+    }
+
+    /// <summary>
+    /// 从本地持仓账本解析该策略的实际持仓方向：有多头行 → 多头；有空头行 → 空头；
+    /// 无记录（尚未成交或外部平仓）→ 按 strategy.Side 兜底。
+    /// </summary>
+    private async Task<bool> ResolveIsLongPositionAsync(TradingStrategy strategy, CancellationToken ct)
+    {
+        var openPositions = await _dataService.GetOpenPositionsAsync(strategy.Symbol, ct).ConfigureAwait(false);
+        var own = openPositions
+            .Where(p => string.Equals(p.StrategyId, strategy.Id, StringComparison.OrdinalIgnoreCase)
+                        && p.RemainingQuantity > 0)
+            .ToList();
+        if (own.Count == 0)
+            return strategy.Side == OrderSide.Buy;
+
+        // 合约双向持仓下同策略理论上可同时有多空行，按数量大者为准（实际不可达，防御性取主方向）
+        var longQty = own.Where(p => p.Side == PositionSide.Long).Sum(p => p.RemainingQuantity);
+        var shortQty = own.Where(p => p.Side == PositionSide.Short).Sum(p => p.RemainingQuantity);
+        return longQty >= shortQty;
     }
 
     /// <summary>
@@ -58,18 +112,22 @@ public sealed partial class AISignalStrategyExecutor(
     private async Task<AISignalExecutionResult> ExecuteHardBoundaryAsync(
         TradingStrategy strategy,
         decimal currentPrice,
+        bool isLongPosition,
         string reasoning,
         CancellationToken ct)
     {
         try
         {
             var positions = await _portfolioService.GetCurrentPositionsAsync(ct).ConfigureAwait(false);
-            var hasPosition = positions.Any(position =>
+            var ownQty = await GetOwnOpenQuantityAsync(strategy, ct);
+            var hasPosition = ownQty > 0 && positions.Any(position =>
                 position.Symbol.Equals(strategy.Symbol, StringComparison.OrdinalIgnoreCase) &&
                 Math.Abs(position.Quantity) > 0);
 
             if (!hasPosition)
             {
+                if ((await _dataService.GetUnsettledTradeRecordsAsync(strategy.Symbol, ct)).Any(r => r.StrategyId == strategy.Id))
+                    return AISignalExecutionResult.NoTrade;
                 // 持仓已不存在（如手动平仓），退出条件失去对象，策略使命结束
                 _logger.LogInformation(
                     "硬性边界触发但已无持仓，直接完结策略: {StrategyId} {Symbol}",
@@ -79,12 +137,15 @@ public sealed partial class AISignalStrategyExecutor(
                 return AISignalExecutionResult.NoTrade;
             }
 
-            // TradeExecutor 从 strategy 读取执行方向；用 try/finally 把翻转限制在本次调用内，
-            // 避免"持仓方向"语义被平仓动作污染（当前策略对象每次评估重新加载，此处防御性恢复使约定显式化）
+            // TradeExecutor 从 strategy 读取执行方向；用 try/finally 把方向翻转限制在本次调用内，
+            // 避免"持仓方向"语义被平仓动作污染（当前策略对象每次评估重新加载，此处防御性恢复使约定显式化）。
+            // 平仓方向由实际持仓方向推导：多头卖出、空头买入
             var originalSide = strategy.Side;
+            var originalQuantity = strategy.Quantity;
             try
             {
-                strategy.Side = originalSide == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
+                strategy.Side = isLongPosition ? OrderSide.Sell : OrderSide.Buy;
+                strategy.Quantity = ownQty;
 
                 var boundaryResult = await _tradeExecutor.ExecuteTradeAsync(
                     strategy, currentPrice, reasoning,
@@ -105,6 +166,7 @@ public sealed partial class AISignalStrategyExecutor(
             finally
             {
                 strategy.Side = originalSide;
+                strategy.Quantity = originalQuantity;
             }
         }
         catch (Exception ex)
@@ -115,25 +177,85 @@ public sealed partial class AISignalStrategyExecutor(
     }
 
     /// <summary>
+    /// 进场下单：市价直下，或 maker 优先（post-only 挂单；拒单立即回退市价）。
+    ///
+    /// maker 优先的价值：maker 与 taker 的费率差（常见 0.02% vs 0.05%）是薄利策略里
+    /// 唯一可确定的正期望，长期胜率不变也能显著改善盈亏比。代价是可能错过快速入场点。
+    /// 回退规则（资金安全优先）：
+    /// - 挂单成功（含部分成交后余量挂盘等待）→ 返回挂单结果，不追单（避免双重成交）；
+    /// - post-only 被交易所拒（GTX/LIMIT_MAKER 会立即吃单时拒单，成交量为 0）→ 立即回退市价；
+    /// - 结果未知 → 只回查原单，不回退；
+    /// - 风控拒绝 / 用户拒绝 / 告警联动拒绝 → 原样返回，绝不回退市价——
+    ///   用市价绕过"用户刚拒绝过的同一笔交易"等于架空风控与人工确认。
+    /// 未成交的余量由 PendingOrderTimeoutService 超时撤单告警，不自动追单。
+    /// </summary>
+    private async Task<TradeResult> ExecuteEntryOrderAsync(
+        TradingStrategy strategy, AISignalParams aiParams, OrderSide entrySide,
+        decimal quantity, decimal currentPrice, AISignalDecision decision,
+        bool requireClose, CancellationToken ct)
+    {
+        // 离场单（现货 SELL 平仓）不做 maker 优先：平仓要的是确定性离场，不是省手续费
+        if (!aiParams.IsMakerFirst || requireClose || aiParams.ParsedExitStyle == ExitStyle.TrailingStop)
+        {
+            return await _tradeExecutor.ExecuteOrderAsync(
+                strategy.Symbol, entrySide, OrderType.Market, quantity, currentPrice,
+                strategyId: strategy.Id, aiReasoning: decision.Reason,
+                requireClose: requireClose, ct: ct).ConfigureAwait(false);
+        }
+
+        // post-only 挂在盘口的己方一侧（买挂买一、卖挂卖一），只做 maker；
+        // 价格用当前价，穿越盘口时交易所会拒单（合约 GTX / 现货 LIMIT_MAKER），此时立即回退市价
+        var makerResult = await _tradeExecutor.ExecuteOrderAsync(
+            strategy.Symbol, entrySide, OrderType.PostOnlyLimit, quantity, currentPrice,
+            limitPrice: currentPrice, strategyId: strategy.Id,
+            aiReasoning: decision.Reason, requireClose: false, ct: ct).ConfigureAwait(false);
+
+        // 挂上或部分成交：返回挂单结果。余量由超时撤单管理，护栏按本单预期数量先行持久化
+        //（交易所侧护栏腿由对账按持仓门控挂出，挂单未成交前不会产生裸卖单）
+        if (makerResult.FailureCategory != TradeFailureCategory.PostOnlyWouldTake)
+            return makerResult;
+
+        // post-only 拒单（成交量 0、状态 REJECTED/EXPIRED 映射为 Failed）：盘口已穿越，
+        // 行情在快速推进，立即回退市价
+        return await _tradeExecutor.ExecuteOrderAsync(
+            strategy.Symbol, entrySide, OrderType.Market, quantity, currentPrice,
+            strategyId: strategy.Id, aiReasoning: decision.Reason,
+            requireClose: false, ct: ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// 影子模式的硬性边界退出：记账不平仓。持仓数量取自影子账本中未平完的开仓行，
     /// 没有未平仓量时直接完结策略（与实盘路径的"持仓已消失"语义一致）。
     /// </summary>
     private async Task<AISignalExecutionResult> ExecuteWithAgentAsync(TradingStrategy strategy,
         decimal currentPrice,
+        AISignalParams aiParams,
         CancellationToken ct)
     {
         try
         {
-            TradingContext.CurrentStrategyId = strategy.Id;
+            // maker 优先的进场单可能长时间挂在盘口未成交：挂单在途期间不做新的开仓决策，
+            // 否则下个评估周期会在"账面仍无持仓"的情况下再挂一张同类买单，双重成交
+            var unsettledRecords = await _dataService.GetUnsettledTradeRecordsAsync(strategy.Symbol, ct)
+                .ConfigureAwait(false);
+            if (unsettledRecords.Any(r =>
+                    string.Equals(r.StrategyId, strategy.Id, StringComparison.OrdinalIgnoreCase)
+                    && r.OrderType is OrderType.Limit or OrderType.PostOnlyLimit))
+            {
+                _logger.LogInformation(
+                    "AI 进场挂单仍在途，跳过本轮决策避免双重成交: {StrategyId} {Symbol}",
+                    strategy.Id, strategy.Symbol);
+                return AISignalExecutionResult.NoTrade;
+            }
 
             var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, ct)
                 .ConfigureAwait(false);
 
-            var prompt = await BuildAIPromptAsync(strategy, currentPrice, priorRecords, ct)
+            var prompt = await BuildAIPromptAsync(strategy, currentPrice, priorRecords, aiParams, ct)
                 .ConfigureAwait(false);
             var responseText = await InvokeAgentAsync(prompt, ct).ConfigureAwait(false);
 
-            if (!AISignalDecisionParser.TryParse(responseText, out var decision) || decision!.IsHold)
+            if (!AISignalDecisionParser.TryParse(responseText, out var decision) || decision.IsHold)
             {
                 _logger.LogInformation(
                     "AI 决策为 HOLD 或无法解析: {StrategyId} 响应片段 {ResponseSnippet}",
@@ -141,17 +263,13 @@ public sealed partial class AISignalStrategyExecutor(
                 return AISignalExecutionResult.NoTrade;
             }
 
-            return await ExecuteDecisionAsync(strategy, currentPrice, decision!, ct)
+            return await ExecuteDecisionAsync(strategy, currentPrice, decision, aiParams, ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "AI 信号策略执行失败: {StrategyId}", strategy.Id);
             return AISignalExecutionResult.Failed;
-        }
-        finally
-        {
-            TradingContext.CurrentStrategyId = null;
         }
     }
 
@@ -163,10 +281,9 @@ public sealed partial class AISignalStrategyExecutor(
         TradingStrategy strategy,
         decimal currentPrice,
         AISignalDecision decision,
+        AISignalParams aiParams,
         CancellationToken ct)
     {
-        var aiParams = AISignalParams.FromJson(strategy.CustomParams) ?? new AISignalParams();
-
         if (decision.Confidence < aiParams.ConfidenceThreshold)
         {
             _logger.LogInformation(
@@ -175,7 +292,14 @@ public sealed partial class AISignalStrategyExecutor(
             return AISignalExecutionResult.NoTrade;
         }
 
-        var entrySide = strategy.Side;
+        // 方向由 AI 决策驱动：BUY 开多 / SELL 开空（合约）或离场（现货）。
+        // 早期实现固定使用 strategy.Side，导致 AI 的 SELL 决策只进日志、不改变任何行为——
+        // 策略被永久锁在单一方向，"AI 决策"名不副实。
+        var entrySide = decision.IsBuy ? OrderSide.Buy : OrderSide.Sell;
+        var isFutures = _tradeExecutor.IsFuturesMode;
+        // 现货无法开空：SELL 只能表达"离场"，交给 requireClose 兜底（无持仓时被拒，不会反向做空）
+        var requireClose = !isFutures && entrySide == OrderSide.Sell;
+
         var budget = aiParams.BudgetUsdt > 0 ? aiParams.BudgetUsdt : strategy.Quantity;
         if (budget <= 0)
         {
@@ -222,24 +346,21 @@ public sealed partial class AISignalStrategyExecutor(
             return AISignalExecutionResult.NoTrade;
         }
 
-        var result = await _tradeExecutor.ExecuteOrderAsync(
-            strategy.Symbol,
-            entrySide,
-            OrderType.Market,
-            quantity,
-            currentPrice,
-            strategyId: strategy.Id,
-            aiReasoning: decision.Reason,
-            requireClose: false,
-            ct: ct).ConfigureAwait(false);
+        var previousQty = await GetOwnOpenQuantityAsync(strategy, ct);
+        var result = await ExecuteEntryOrderAsync(
+            strategy, aiParams, entrySide, quantity, currentPrice, decision, requireClose, ct)
+            .ConfigureAwait(false);
 
         if (!result.Success || result.Record == null)
             return new AISignalExecutionResult(null, result);
 
         // 成交后自动附加护栏：本地按决策价/档案兜底价生成并持久化，下个 tick 即生效
-        var effectiveExecutedQty = result.Record.ExecutedQty > 0 ? result.Record.ExecutedQty : quantity;
-        await ApplyGuardrailsAsync(strategy, aiParams, entrySide, currentPrice, effectiveExecutedQty, decision, ct)
-            .ConfigureAwait(false);
+        if (!requireClose && !result.Record.ReduceOnly && result.Record.Status != TradeRecordStatus.Failed)
+        {
+            var remaining = await GetOwnOpenQuantityAsync(strategy, ct);
+            if (remaining > 0 || aiParams.ParsedExitStyle != ExitStyle.TrailingStop)
+                await ApplyGuardrailsAsync(strategy, aiParams, entrySide, currentPrice, remaining, previousQty, decision, ct);
+        }
         await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct).ConfigureAwait(false);
 
         return new AISignalExecutionResult(result.Record, result);
@@ -252,6 +373,7 @@ public sealed partial class AISignalStrategyExecutor(
         TradingStrategy strategy,
         decimal currentPrice,
         List<TradeRecord> priorRecords,
+        AISignalParams aiParams,
         CancellationToken ct)
     {
         var recentSummary = priorRecords.
@@ -262,7 +384,6 @@ public sealed partial class AISignalStrategyExecutor(
         var positionSummary = await BuildPositionSummaryAsync(strategy.Symbol, ct).ConfigureAwait(false);
         var analysisContext = BuildAnalysisContext(strategy.Symbol);
 
-        var aiParams = AISignalParams.FromJson(strategy.CustomParams) ?? new AISignalParams();
         var budget = aiParams.BudgetUsdt > 0 ? aiParams.BudgetUsdt : strategy.Quantity;
         var todayStats = await _dataService.GetTodayStatsAsync(ct).ConfigureAwait(false);
         var maxDailyTrades = (await _dataService.LoadRiskConfigAsync(ct).ConfigureAwait(false)).MaxDailyTrades;
@@ -283,7 +404,7 @@ public sealed partial class AISignalStrategyExecutor(
 
             ## 输出格式（强制）
             你的最终回答必须且只能是一个 JSON 对象，格式如下，禁止输出任何其他文字、markdown 代码块标记或工具调用说明。
-            下单由系统完成，禁止调用任何下单（PlaceOrder）工具；你可以调用行情、持仓等技术指标查询工具辅助决策。
+            下单由系统完成，你没有下单能力；你可以调用行情、持仓、技术指标等查询工具辅助决策。
             {jsonTemplate}
 
             ## 决策约束
@@ -395,6 +516,15 @@ public sealed class AISignalExecutionResult
     /// </summary>
     public static AISignalExecutionResult Failed { get; } = new(null, null, AISignalOutcome.Failed);
 
+    /// <summary>AI 策略参数缺失或损坏。策略已暂停，不进入普通失败冷却。</summary>
+    public static AISignalExecutionResult ConfigurationFailed(string reason) =>
+        new(null, new TradeResult
+        {
+            Success = false,
+            ErrorMessage = reason,
+            FailureCategory = TradeFailureCategory.Rejected
+        }, AISignalOutcome.ConfigurationFailed);
+
     public AISignalExecutionResult(TradeRecord? record)
         : this(record, null, record != null ? AISignalOutcome.Executed : AISignalOutcome.NoTrade)
     {
@@ -430,5 +560,8 @@ public enum AISignalOutcome
     NoTrade,
 
     /// <summary>执行异常（网络、Agent 调用失败等）</summary>
-    Failed
+    Failed,
+
+    /// <summary>AI 策略参数缺失或损坏，策略已暂停等待人工修复</summary>
+    ConfigurationFailed
 }

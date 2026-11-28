@@ -50,7 +50,7 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
             var facts = new AdaptiveFactSet();
             facts.Facts.Add(new AdaptiveFact("流动比率", model.HealthAssessment.CurrentRatio?.ToString("F2") ?? "N/A"));
             facts.Facts.Add(new AdaptiveFact("速动比率", model.HealthAssessment.QuickRatio?.ToString("F2") ?? "N/A"));
-            facts.Facts.Add(new AdaptiveFact("资产负债率", model.HealthAssessment.DebtRatio?.ToString("F2") + "%"));
+            facts.Facts.Add(new AdaptiveFact("资产负债率", FormatPercent(model.HealthAssessment.DebtRatio)));
             facts.Facts.Add(new AdaptiveFact("负债率趋势", GetEnumDescription(model.HealthAssessment.DebtRatioTrend)));
             leftCol.Items.Add(facts);
 
@@ -64,8 +64,7 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
         {
             hasRight = true;
             // 1. 盈利质量看板 (这里没有直接的评分，可以用ROE作为大数字展示)
-            var roe = model.ProfitQuality.ROE?.ToString("F2") + "%";
-            AddScoreHeader(rightCol.Items, "ROE", roe);
+            AddScoreHeader(rightCol.Items, "ROE", FormatPercent(model.ProfitQuality.ROE));
 
             // 2. 可持续性描述 (加粗前置)
             if (!string.IsNullOrEmpty(model.ProfitQuality.ProfitSustainability))
@@ -75,9 +74,9 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
 
             // 3. 详细指标
             var facts = new AdaptiveFactSet();
-            facts.Facts.Add(new AdaptiveFact("ROA", model.ProfitQuality.ROA?.ToString("F2") + "%"));
-            facts.Facts.Add(new AdaptiveFact("毛利率", model.ProfitQuality.GrossMargin?.ToString("F2") + "%"));
-            facts.Facts.Add(new AdaptiveFact("净利率", model.ProfitQuality.NetMargin?.ToString("F2") + "%"));
+            facts.Facts.Add(new AdaptiveFact("ROA", FormatPercent(model.ProfitQuality.ROA)));
+            facts.Facts.Add(new AdaptiveFact("毛利率", FormatPercent(model.ProfitQuality.GrossMargin)));
+            facts.Facts.Add(new AdaptiveFact("净利率", FormatPercent(model.ProfitQuality.NetMargin)));
             facts.Facts.Add(new AdaptiveFact("净利趋势", GetEnumDescription(model.ProfitQuality.NetMarginTrend)));
             rightCol.Items.Add(facts);
         }
@@ -128,4 +127,8 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
 
         return card;
     }
+
+    /// <summary>百分比文本；模型约定无数据时为 null，此时显示 N/A 而不是孤立的 "%"。</summary>
+    private static string FormatPercent(float? value)
+        => value is { } percent ? $"{percent:F2}%" : "N/A";
 }

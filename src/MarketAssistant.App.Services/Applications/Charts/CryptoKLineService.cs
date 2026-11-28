@@ -15,7 +15,7 @@ public class CryptoKLineService(
     BinanceMarketDataService binanceService,
     ILogger<CryptoKLineService> logger) : IKLineService
 {
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly BinanceMarketDataService _binanceService = binanceService;
     private readonly ILogger<CryptoKLineService> _logger = logger;
 
     /// <summary>

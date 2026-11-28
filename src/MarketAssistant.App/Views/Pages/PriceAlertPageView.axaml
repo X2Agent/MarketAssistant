@@ -7,7 +7,6 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:alert="using:MarketAssistant.Applications.PriceAlert"
              xmlns:converts="using:MarketAssistant.Converters"
-             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.PriceAlertPageView"
              x:DataType="vm:PriceAlertPageViewModel">
@@ -31,162 +30,112 @@
         <Style Selector="Ellipse.rule-dot.triggered">
             <Setter Property="Fill" Value="{StaticResource WarningBrush}"/>
         </Style>
-        <Style Selector="Border.alert-rule-card:pointerover">
-            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        <!-- 告警条件的方向箭头：几何图标，与同行标签文字垂直居中。
+             不用 ↑ ↓ 文字字形——字形大小与基线随字体回退链变化 -->
+        <Style Selector="PathIcon.condition-arrow">
+            <Setter Property="Width" Value="{StaticResource MiniIconSize}"/>
+            <Setter Property="Height" Value="{StaticResource MiniIconSize}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <!-- 文本式页签（替代默认胶囊样式）：未选中次级文本色，选中主色 + 底部主色下划线指示器 -->
-        <Style Selector="TabControl.page-tabs">
-            <Setter Property="Background" Value="Transparent"/>
+        <!-- 规则行写在 DataTemplate 里：模板内本地的 {DynamicResource} 值会被 body-sm / num 这类
+             类样式盖掉（字重落回 Normal、前景落回主色），所以行内需要加粗或着色的文字一律用具名类表达。
+             条件文本（名称与目标值）：有方向的名称取涨跌标签字色（压在行底色上比 BullishBrush / BearishBrush
+             对比度高），量比这类无方向条件保持主文字色。全部 15 种条件共用一套模板。 -->
+        <Style Selector="TextBlock.rule-name">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
         </Style>
-        <Style Selector="TabControl.page-tabs TabItem">
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Border Background="Transparent"
-                            Padding="0,6,24,8"
-                            Cursor="Hand">
-                        <Panel>
-                            <TextBlock x:Name="PART_TabText"
-                                       Text="{TemplateBinding Header}"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <Border x:Name="PART_Indicator"
-                                    Height="2"
-                                    CornerRadius="1"
-                                    Background="{StaticResource PrimaryBrush}"
-                                    VerticalAlignment="Bottom"
-                                    IsVisible="False"/>
-                        </Panel>
-                    </Border>
-                </ControlTemplate>
-            </Setter>
-        </Style>
-        <Style Selector="TabControl.page-tabs TabItem:pointerover /template/ TextBlock#PART_TabText">
+        <Style Selector="TextBlock.condition-text">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <Style Selector="TabControl.page-tabs TabItem:selected /template/ TextBlock#PART_TabText">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        <Style Selector="TextBlock.condition-text.up">
+            <Setter Property="Foreground" Value="{DynamicResource BullishTagTextBrush}"/>
         </Style>
-        <Style Selector="TabControl.page-tabs TabItem:selected /template/ Border#PART_Indicator">
-            <Setter Property="IsVisible" Value="True"/>
+        <Style Selector="TextBlock.condition-text.down">
+            <Setter Property="Foreground" Value="{DynamicResource BearishTagTextBrush}"/>
         </Style>
     </UserControl.Styles>
 
-    <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
-        <controls:CardView Margin="{StaticResource PagePadding}">
-            <controls:CardView.Header>
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Grid.Column="0"
-                                Orientation="Horizontal"
-                                Spacing="{StaticResource SmallSpacing}"
-                                VerticalAlignment="Center">
-                        <svg:Svg Path="/Assets/Images/tab_alert.svg"
-                                 Width="{StaticResource DefaultIconSize}"
-                                 Height="{StaticResource DefaultIconSize}"/>
-                        <StackPanel Spacing="{StaticResource CompactSpacing}">
-                            <TextBlock Text="价格告警"
-                                       FontSize="{StaticResource LargeFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="持续跟踪目标价格与涨跌幅，行情更新后自动判定"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
+    <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
 
-                    <Button Grid.Column="1"
-                            Content="刷新列表"
-                            Command="{Binding RefreshCommand}"
-                            Classes="btn-secondary"
-                            VerticalAlignment="Center"/>
-                </Grid>
-            </controls:CardView.Header>
+        <!-- ===== 页签栏：固定在内容区顶部，不随内容滚动 ===== -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderThickness="{StaticResource NoBorderThickness}"
+                CornerRadius="{StaticResource CardCornerRadius}"
+                Margin="{StaticResource BottomMargin}">
+            <StackPanel Orientation="Horizontal" Margin="{StaticResource HorizontalMargin}">
+                <Button Classes="underline-tab" Content="告警规则"
+                        Classes.selected="{Binding IsRulesTabSelected}"
+                        Command="{Binding SelectTabCommand}" CommandParameter="0"/>
+                <Button Classes="underline-tab" Content="告警历史"
+                        Classes.selected="{Binding IsHistoryTabSelected}"
+                        Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+            </StackPanel>
+        </Border>
 
-            <Grid RowDefinitions="Auto,*">
-                <TabControl Grid.Row="0"
-                            Classes="page-tabs"
-                            SelectedIndex="{Binding SelectedTabIndex}">
-                    <TabItem Header="告警规则"/>
-                    <TabItem Header="告警历史"/>
-                </TabControl>
+        <!-- ===== 规则管理：表单与列表同处一个滚动区，窄窗下不会把列表压没 ===== -->
+        <ScrollViewer Grid.Row="1" IsVisible="{Binding IsRulesTabSelected}">
+            <Grid RowDefinitions="Auto,Auto,Auto">
 
-                <!-- 规则管理（原有内容，仅在"告警规则"标签页显示） -->
-                <Grid Grid.Row="1" RowDefinitions="Auto,Auto,Auto,*"
-                      IsVisible="{Binding !IsHistoryTabSelected}">
+                <!-- 创建规则卡片：与其它卡片同表面。不用 SelectedBackgroundBrush 铺底——
+                     那是"选中项"的令牌，大面积铺开会变成整页第二个强调色焦点，
+                     输入框的 SunkenBackgroundBrush 在其上也读不出凹陷层次。 -->
                 <Border Grid.Row="0"
-                        Background="{DynamicResource SelectedBackgroundBrush}"
-                        BorderBrush="{StaticResource PrimaryBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderThickness="{StaticResource NoBorderThickness}"
                         CornerRadius="{StaticResource CardCornerRadius}"
-                        Padding="{StaticResource DefaultCardPadding}"
+                        Padding="{StaticResource CardPadding}"
                         Margin="{StaticResource BottomMargin}">
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource DefaultSpacing}">
-                        <Border Grid.Column="0"
-                                Width="48"
-                                Height="48"
-                                Background="{StaticResource PrimaryBrush}"
-                                CornerRadius="{StaticResource CardCornerRadius}"
-                                VerticalAlignment="Top">
-                            <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
-                                      Width="{StaticResource DefaultIconSize}"
-                                      Height="{StaticResource DefaultIconSize}"
-                                      Foreground="{StaticResource TextOnEmphasisBrush}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                        </Border>
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <StackPanel Spacing="{StaticResource CompactSpacing}">
+                            <TextBlock Text="创建告警规则" Classes="card-title"/>
+                            <TextBlock Text="持续告警进入目标区间提醒一次、离开后自动复位；勾选“仅提醒一次”则触发后自动停用，可手动重新启用。"
+                                       Classes="caption"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
 
-                        <StackPanel Grid.Column="1" Spacing="{StaticResource DefaultSpacing}">
-                            <StackPanel Spacing="{StaticResource CompactSpacing}">
-                                <TextBlock Text="创建告警规则"
-                                           FontSize="{StaticResource SectionTitleFontSize}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                <TextBlock Text="持续告警进入目标区间提醒一次、离开后自动复位；勾选“仅提醒一次”则触发后自动停用，可手动重新启用。"
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
-
-                            <Grid ColumnDefinitions="Auto,2*,Auto,*,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto"
-                                  ColumnSpacing="{StaticResource SmallSpacing}">
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding AssetLabelText}"
-                                           Classes="form-label"
-                                           VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1"
-                                          IsEditable="True"
+                        <!-- 主字段：标签在上、控件在下。混排成一行会让每列宽度由标签字数决定，无法对齐。 -->
+                        <Grid RowDefinitions="Auto,Auto"
+                              ColumnDefinitions="*,*,*,*"
+                              ColumnSpacing="{StaticResource GridGutter}"
+                              RowSpacing="{StaticResource GridGutter}">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="{Binding AssetLabelText}" Classes="form-label"/>
+                                <ComboBox IsEditable="True"
                                           ItemsSource="{Binding AssetOptions}"
                                           SelectedItem="{Binding NewRuleSelectedAsset}"
                                           Text="{Binding NewRuleAssetText, Mode=TwoWay}"
                                           IsDropDownOpen="{Binding IsAssetDropDownOpen, Mode=TwoWay}"
+                                          DropDownClosed="OnAssetBoxDropDownClosed"
                                           PlaceholderText="{Binding AssetPlaceholderText}"
                                           MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
                                           MinHeight="{StaticResource InputHeight}"
+                                          HorizontalAlignment="Stretch"
                                           IsEnabled="{Binding !IsWatchlistScopeSelected}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate x:DataType="vm:AssetOption">
                                             <StackPanel Spacing="{StaticResource CompactSpacing}"
                                                         Margin="{StaticResource TinyMargin}">
                                                 <TextBlock Text="{Binding Name}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{Binding Code}"
-                                                           FontSize="{StaticResource SmallFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
+                            </StackPanel>
 
-                                <TextBlock Grid.Column="2"
-                                           Text="作用域"
-                                           Classes="form-label"
-                                           VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="3"
-                                          ItemsSource="{Binding ScopeOptions}"
+                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="作用域" Classes="form-label"/>
+                                <ComboBox ItemsSource="{Binding ScopeOptions}"
                                           SelectedItem="{Binding NewRuleScope}"
                                           MinHeight="{StaticResource InputHeight}"
+                                          HorizontalAlignment="Stretch"
                                           ToolTip.Tip="自选股：对当前市场全部自选股生效，每个标的独立触发">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -194,196 +143,203 @@
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
+                            </StackPanel>
 
-                                <TextBlock Grid.Column="4"
-                                           Text="触发条件"
-                                           Classes="form-label"
-                                           VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="5"
-                                          ItemsSource="{Binding ConditionOptions}"
+                            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="触发条件" Classes="form-label"/>
+                                <ComboBox ItemsSource="{Binding ConditionOptions}"
                                           SelectedItem="{Binding NewRuleCondition}"
-                                          MinHeight="{StaticResource InputHeight}">
+                                          MinHeight="{StaticResource InputHeight}"
+                                          HorizontalAlignment="Stretch">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
+                            </StackPanel>
 
-                                <TextBlock Grid.Column="6"
-                                           Text="{Binding TargetLabelText}"
-                                           Classes="form-label"
-                                           VerticalAlignment="Center"/>
-                                <TextBox Grid.Column="7"
-                                         Text="{Binding NewRuleTargetValue}"
+                            <StackPanel Grid.Row="0" Grid.Column="3" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="{Binding TargetLabelText}" Classes="form-label"/>
+                                <TextBox Text="{Binding NewRuleTargetValue}"
                                          PlaceholderText="{Binding TargetPlaceholderText}"
                                          MinHeight="{StaticResource InputHeight}"
                                          IsEnabled="{Binding HasTargetValue}"/>
+                            </StackPanel>
 
-                                <TextBlock Grid.Column="8"
-                                           Text="K线周期"
-                                           Classes="form-label"
-                                           VerticalAlignment="Center"
-                                           IsVisible="{Binding IsIndicatorRuleSelected}"/>
-                                <ComboBox Grid.Column="9"
-                                          ItemsSource="{Binding KLinePeriodOptions}"
+                            <!-- 指标类规则才出现的 K 线周期：换到第二行首列，避免挤压上面四个常用字段 -->
+                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}"
+                                        IsVisible="{Binding IsIndicatorRuleSelected}">
+                                <TextBlock Text="K线周期" Classes="form-label"/>
+                                <ComboBox ItemsSource="{Binding KLinePeriodOptions}"
                                           SelectedItem="{Binding NewRuleKLineType}"
                                           MinHeight="{StaticResource InputHeight}"
-                                          IsVisible="{Binding IsIndicatorRuleSelected}">
+                                          HorizontalAlignment="Stretch">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
+                            </StackPanel>
+                        </Grid>
 
-                                <CheckBox Grid.Column="10"
-                                          Content="仅提醒一次"
-                                          IsChecked="{Binding NewRuleIsOneTime}"
-                                          VerticalAlignment="Center"
-                                          ToolTip.Tip="触发一次后自动停用；可手动重新启用。默认持续告警，离开目标区间后自动复位。"/>
+                        <!-- 选项与提交：复选框在左、主按钮在右，与字段同一基线 -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <CheckBox Grid.Column="0"
+                                      Content="仅提醒一次"
+                                      IsChecked="{Binding NewRuleIsOneTime}"
+                                      VerticalAlignment="Center"
+                                      ToolTip.Tip="触发一次后自动停用；可手动重新启用。默认持续告警，离开目标区间后自动复位。"/>
+                            <Button Grid.Column="1"
+                                    Content="创建告警"
+                                    Command="{Binding AddRuleCommand}"
+                                    Classes="btn-primary"
+                                    MinWidth="{StaticResource MediumButtonMinWidth}"
+                                    VerticalAlignment="Center"/>
+                        </Grid>
 
-                                <Button Grid.Column="11"
-                                        Content="创建告警"
-                                        Command="{Binding AddRuleCommand}"
-                                        Classes="btn-primary"
-                                        MinWidth="{StaticResource MediumButtonMinWidth}"
-                                        MinHeight="{StaticResource InputHeight}"
-                                        VerticalAlignment="Center"/>
-                            </Grid>
+                        <TextBlock Text="{Binding ValidationError}"
+                                   Classes="form-error"
+                                   IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                            <TextBlock Text="{Binding ValidationError}"
-                                       Classes="form-error"
-                                       IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-                            <!-- 高级选项：去抖 / 冷却 / 限次 / 交易联动（默认收起，保持常用创建路径简洁） -->
-                            <Expander HorizontalAlignment="Stretch"
-                                      IsExpanded="{Binding IsAdvancedOptionsExpanded, Mode=TwoWay}">
-                                <Expander.Header>
-                                    <TextBlock Text="高级选项（去抖确认 / 冷却 / 触发次数 / 交易联动）"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                </Expander.Header>
-                                <StackPanel Spacing="{StaticResource CompactSpacing}"
-                                            Margin="{StaticResource TinyMargin}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*"
-                                          ColumnSpacing="{StaticResource SmallSpacing}">
-                                        <TextBlock Grid.Column="0"
-                                                   Text="去抖确认（连续行情次数）"
-                                                   Classes="form-label"
-                                                   VerticalAlignment="Center"/>
-                                        <NumericUpDown Grid.Column="1"
-                                                       Value="{Binding NewRuleConfirmTicks, Mode=TwoWay}"
+                        <!-- 高级选项：卡片内嵌手风琴用 inline 变体（同 StrategyConfigView 的「高级参数」）。
+                             section-card 是页面级分组壳，套进卡片会与父卡同色、只剩一圈无效圆角。 -->
+                        <Expander Classes="inline"
+                                  Header="高级选项（去抖确认 / 冷却 / 触发次数 / 交易联动）"
+                                  HorizontalAlignment="Stretch"
+                                  IsExpanded="{Binding IsAdvancedOptionsExpanded, Mode=TwoWay}">
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}"
+                                        Margin="{StaticResource TinyTopMargin}">
+                                <Grid ColumnDefinitions="*,*,*,*"
+                                      ColumnSpacing="{StaticResource GridGutter}">
+                                    <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                        <TextBlock Text="去抖确认（连续行情次数）" Classes="form-label"/>
+                                        <NumericUpDown Value="{Binding NewRuleConfirmTicks, Mode=TwoWay}"
                                                        Minimum="0"
                                                        Maximum="100"
                                                        Increment="1"
                                                        ShowButtonSpinner="False"
-                                                       Width="110"
-                                                       HorizontalAlignment="Left"
+                                                       HorizontalAlignment="Stretch"
                                                        ToolTip.Tip="条件需连续满足指定行情次数才触发，0 表示立即触发"/>
+                                    </StackPanel>
 
-                                        <TextBlock Grid.Column="2"
-                                                   Text="冷却时间（分钟）"
-                                                   Classes="form-label"
-                                                   VerticalAlignment="Center"/>
-                                        <NumericUpDown Grid.Column="3"
-                                                       Value="{Binding NewRuleCooldownMinutes, Mode=TwoWay}"
+                                    <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                        <TextBlock Text="冷却时间（分钟）" Classes="form-label"/>
+                                        <NumericUpDown Value="{Binding NewRuleCooldownMinutes, Mode=TwoWay}"
                                                        Minimum="0"
                                                        Maximum="1440"
                                                        Increment="5"
                                                        ShowButtonSpinner="False"
-                                                       Width="110"
-                                                       HorizontalAlignment="Left"
+                                                       HorizontalAlignment="Stretch"
                                                        ToolTip.Tip="两次触发之间的最小间隔，0 表示不冷却"/>
+                                    </StackPanel>
 
-                                        <TextBlock Grid.Column="4"
-                                                   Text="最大触发次数"
-                                                   Classes="form-label"
-                                                   VerticalAlignment="Center"/>
-                                        <NumericUpDown Grid.Column="5"
-                                                       Value="{Binding NewRuleMaxTriggerCount, Mode=TwoWay}"
+                                    <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}">
+                                        <TextBlock Text="最大触发次数" Classes="form-label"/>
+                                        <NumericUpDown Value="{Binding NewRuleMaxTriggerCount, Mode=TwoWay}"
                                                        Minimum="0"
                                                        Maximum="1000"
                                                        Increment="1"
                                                        ShowButtonSpinner="False"
-                                                       Width="110"
-                                                       HorizontalAlignment="Left"
+                                                       HorizontalAlignment="Stretch"
                                                        ToolTip.Tip="达到次数后规则不再触发，0 表示不限；勾选“仅提醒一次”时恒为 1 次"/>
-                                    </Grid>
+                                    </StackPanel>
 
-                                    <Grid ColumnDefinitions="Auto,*,Auto,*"
-                                          ColumnSpacing="{StaticResource SmallSpacing}">
-                                        <TextBlock Grid.Column="0"
-                                                   Text="去抖持续（秒）"
-                                                   Classes="form-label"
-                                                   VerticalAlignment="Center"/>
-                                        <NumericUpDown Grid.Column="1"
-                                                       Value="{Binding NewRuleConfirmSeconds, Mode=TwoWay}"
+                                    <StackPanel Grid.Column="3" Spacing="{StaticResource TinySpacing}">
+                                        <TextBlock Text="去抖持续（秒）" Classes="form-label"/>
+                                        <NumericUpDown Value="{Binding NewRuleConfirmSeconds, Mode=TwoWay}"
                                                        Minimum="0"
                                                        Maximum="600"
                                                        Increment="5"
                                                        ShowButtonSpinner="False"
-                                                       Width="110"
-                                                       HorizontalAlignment="Left"
+                                                       HorizontalAlignment="Stretch"
                                                        ToolTip.Tip="条件需持续满足的秒数，与连续次数同时配置时取更严判定；0 表示不限制"/>
-                                    </Grid>
+                                    </StackPanel>
+                                </Grid>
 
-                                    <CheckBox Content="确认级告警：触发期间该标的的 AI 交易信号强制人工确认（条件离开告警区间后自动解除）"
-                                              IsChecked="{Binding NewRuleRequireConfirmation}"
-                                              VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Expander>
+                                <CheckBox Content="确认级告警：触发期间该标的的 AI 交易信号强制人工确认（条件离开告警区间后自动解除）"
+                                          IsChecked="{Binding NewRuleRequireConfirmation}"
+                                          VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Expander>
 
-                            <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                    Padding="{StaticResource SmallCardPadding}"
-                                    IsVisible="{Binding !IsNotificationEnabled}">
-                                <TextBlock Text="桌面通知已关闭：告警触发状态仍会记录，但不会显示弹窗。请在“设置 → 通知设置”中开启通知。"
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           Foreground="{StaticResource WarningBrush}"
-                                           TextWrapping="Wrap"/>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
+                        <controls:StatusBanner Severity="Warning"
+                                               Message="桌面通知已关闭：告警触发状态仍会记录，但不会显示弹窗。请在“设置 → 通知设置”中开启通知。"
+                                               IsVisible="{Binding !IsNotificationEnabled}"/>
+                    </StackPanel>
                 </Border>
 
                 <Grid Grid.Row="1"
-                      ColumnDefinitions="*,Auto"
+                      ColumnDefinitions="*,Auto,Auto"
                       Margin="{StaticResource SmallBottomMargin}">
                     <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
-                        <TextBlock Text="告警规则"
-                                   FontSize="{StaticResource SectionTitleFontSize}"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="告警规则" Classes="card-title"/>
                         <TextBlock Text="浮动值 = 当前告警值 - 实际阈值（跌幅目标 3% 的实际阈值为 -3%）"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                   Classes="caption"/>
                     </StackPanel>
-                    <Border Grid.Column="1"
-                            Background="{DynamicResource SurfaceVariantBrush}"
-                            CornerRadius="{StaticResource TinyCornerRadius}"
-                            Padding="{StaticResource TagPadding}"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Rules.Count, StringFormat='{}{0} 条'}"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    </Border>
+                    <!-- 刷新：列表自身的操作，放在列表标题行比页面级页头更贴近语义 -->
+                    <Button Grid.Column="1"
+                            Content="刷新"
+                            Command="{Binding RefreshCommand}"
+                            Classes="btn-secondary btn-sm"
+                            VerticalAlignment="Center"
+                            Margin="{StaticResource SmallRightMargin}"/>
+                    <controls:StatusTag Grid.Column="2"
+                                        Text="{Binding Rules.Count, StringFormat='{}{0} 条'}"/>
                 </Grid>
 
-                <StackPanel Grid.Row="2"
-                            IsVisible="{Binding IsInitialLoading}"
-                            Spacing="{StaticResource SmallSpacing}"
-                            Margin="{StaticResource BottomMargin}">
-                    <Border Classes="skeleton skeleton-row" Height="96"/>
-                    <Border Classes="skeleton skeleton-row" Height="96"/>
-                    <Border Classes="skeleton skeleton-row" Height="96"/>
-                    <Border Classes="skeleton skeleton-row" Height="96"/>
-                    <Border Classes="skeleton skeleton-row" Height="96"/>
-                </StackPanel>
+                <Grid Grid.Row="2">
+                    <!-- 首屏骨架：5 条规则卡的结构克隆（同列宽、同内边距、同开关与删除按钮尺寸） -->
+                    <controls:SkeletonList Count="5"
+                                           Spacing="{StaticResource SmallSpacing}"
+                                           IsVisible="{Binding IsInitialLoading}">
+                        <controls:SkeletonList.ItemTemplate>
+                            <DataTemplate>
+                                <controls:SkeletonCard Variant="Row"
+                                                       Background="{DynamicResource ItemBackgroundBrush}"
+                                                       CornerRadius="{StaticResource CardCornerRadius}"
+                                                       Padding="{StaticResource DefaultPadding}">
+                                    <Grid ColumnDefinitions="2*,1.2*,1.2*,1.6*,Auto,Auto"
+                                          ColumnSpacing="{StaticResource DefaultSpacing}">
+                                        <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <controls:SkeletonLines Row="BodySm" LineCount="1" LineWidths="104"/>
+                                            <controls:SkeletonLines Row="Caption" LineCount="1" LineWidths="132"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <controls:SkeletonLines Row="Caption" LineCount="1" LineWidths="48"/>
+                                            <controls:SkeletonLines Row="BodySm" LineCount="1" LineWidths="72"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <controls:SkeletonLines Row="Caption" LineCount="1" LineWidths="48"/>
+                                            <controls:SkeletonLines Row="BodySm" LineCount="1" LineWidths="60"/>
+                                            <controls:SkeletonLines Row="Caption" LineCount="1" LineWidths="44"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <controls:SkeletonLines Row="Caption" LineCount="1" LineWidths="60"/>
+                                            <controls:SkeletonLines Row="Body" LineCount="1" LineWidths="66"/>
+                                            <controls:SkeletonLines Row="Caption" LineCount="1" LineWidths="56"/>
+                                        </StackPanel>
+                                        <!-- 开关与删除按钮：与真实控件同尺寸 -->
+                                        <Border Grid.Column="4"
+                                                Classes="skeleton"
+                                                Width="40" Height="20"
+                                                CornerRadius="10"
+                                                VerticalAlignment="Center"/>
+                                        <Border Grid.Column="5"
+                                                Classes="skeleton skeleton-circle"
+                                                Width="{StaticResource SmallIconButtonSize}"
+                                                Height="{StaticResource SmallIconButtonSize}"
+                                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                                VerticalAlignment="Center"/>
+                                    </Grid>
+                                </controls:SkeletonCard>
+                            </DataTemplate>
+                        </controls:SkeletonList.ItemTemplate>
+                    </controls:SkeletonList>
 
-                <Grid Grid.Row="3" IsVisible="{Binding !IsInitialLoading}">
                     <ItemsControl ItemsSource="{Binding Rules}"
-                                  IsVisible="{Binding Rules.Count}">
+                                  IsVisible="{Binding !IsInitialLoading}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Spacing="{StaticResource SmallSpacing}"/>
@@ -391,10 +347,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="alert:PriceAlertRule">
-                                <Border Classes="alert-rule-card"
-                                        Background="{DynamicResource ItemBackgroundBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                                <Border Background="{DynamicResource ItemBackgroundBrush}"
+                                        BorderThickness="{StaticResource NoBorderThickness}"
                                         CornerRadius="{StaticResource CardCornerRadius}"
                                         Padding="{StaticResource DefaultPadding}">
                                     <Grid ColumnDefinitions="2*,1.2*,1.2*,1.6*,Auto,Auto"
@@ -408,111 +362,68 @@
                                                      Height="{StaticResource DotIconSize}"
                                                      VerticalAlignment="Center"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding AssetName}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="Bold"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                <TextBlock Text="{Binding AssetName}" Classes="body-sm rule-name"
                                                            TextTrimming="CharacterEllipsis"/>
                                                 <StackPanel Orientation="Horizontal"
                                                             Spacing="{StaticResource TinySpacing}"
                                                             Margin="{StaticResource TinyTopMargin}">
-                                                    <TextBlock Text="{Binding AssetCode}"
-                                                               FontSize="{StaticResource SmallFontSize}"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                    <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                                            Padding="{StaticResource TagPadding}">
-                                                        <TextBlock Text="{Binding MarketType, Converter={StaticResource EnumDescriptionConverter}}"
-                                                                   FontSize="{StaticResource TinyFontSize}"
-                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                    </Border>
-                                                    <Border Background="{StaticResource WarningBrush}"
-                                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                                            Padding="{StaticResource TagPadding}"
-                                                            IsVisible="{Binding IsOneTime}">
-                                                        <TextBlock Text="一次性" FontSize="{StaticResource TinyFontSize}" Foreground="{StaticResource TextOnEmphasisBrush}"/>
-                                                    </Border>
-                                                    <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                                            Padding="{StaticResource TagPadding}"
-                                                            IsVisible="{Binding !IsOneTime}">
-                                                        <TextBlock Text="持续" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                    </Border>
-                                                    <Border Background="{StaticResource WarningBrush}"
-                                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                                            Padding="{StaticResource TagPadding}"
-                                                            IsVisible="{Binding Triggered}">
-                                                        <TextBlock Text="已触发" FontSize="{StaticResource TinyFontSize}" Foreground="{StaticResource TextOnEmphasisBrush}"/>
-                                                    </Border>
+                                                    <TextBlock Text="{Binding AssetCode}" Classes="caption" VerticalAlignment="Center"/>
+                                                    <controls:StatusTag Text="{Binding MarketType, Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                    <controls:StatusTag Text="一次性" Classes="warning" IsVisible="{Binding IsOneTime}"/>
+                                                    <controls:StatusTag Text="持续" IsVisible="{Binding !IsOneTime}"/>
+                                                    <controls:StatusTag Text="已触发" Classes="warning" IsVisible="{Binding Triggered}"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
 
                                         <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                                            <TextBlock Text="告警条件" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceAbove}}">
-                                                <TextBlock Text="↑ 涨破" FontWeight="SemiBold" Foreground="{StaticResource BullishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="Bold"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceBelow}}">
-                                                <TextBlock Text="↓ 跌破" FontWeight="SemiBold" Foreground="{StaticResource BearishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="Bold"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentAbove}}">
-                                                <TextBlock Text="↑ 涨幅超" FontWeight="SemiBold" Foreground="{StaticResource BullishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="Bold"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentBelow}}">
-                                                <TextBlock Text="↓ 跌幅超" FontWeight="SemiBold" Foreground="{StaticResource BearishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="Bold"/>
+                                            <TextBlock Text="告警条件" Classes="caption"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                <PathIcon Classes="condition-arrow"
+                                                          Data="{StaticResource ArrowUpIcon}"
+                                                          Foreground="{StaticResource BullishBrush}"
+                                                          IsVisible="{Binding IsUpwardCondition}"/>
+                                                <PathIcon Classes="condition-arrow"
+                                                          Data="{StaticResource ArrowDownIcon}"
+                                                          Foreground="{StaticResource BearishBrush}"
+                                                          IsVisible="{Binding IsDownwardCondition}"/>
+                                                <TextBlock Classes="condition-text"
+                                                           Classes.up="{Binding IsUpwardCondition}"
+                                                           Classes.down="{Binding IsDownwardCondition}"
+                                                           Text="{Binding Condition, Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                <TextBlock Classes="num condition-text"
+                                                           Text="{Binding ConditionValueText}"
+                                                           IsVisible="{Binding ConditionValueText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                             </StackPanel>
                                             <TextBlock Text="{Binding RuleOptionsText}"
-                                                       FontSize="{StaticResource TinyFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Classes="caption"
                                                        TextTrimming="CharacterEllipsis"
                                                        IsVisible="{Binding RuleOptionsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                                            <TextBlock Text="实时价格" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="实时价格" Classes="caption"/>
                                             <TextBlock Text="{Binding CurrentPriceText}"
                                                        FontFamily="{StaticResource DataFontFamily}"
-                                                       FontSize="{StaticResource LabelFontSize}"
-                                                       FontWeight="Bold"
+                                                       FontSize="{StaticResource BodySmFontSize}"
+                                                       FontWeight="{DynamicResource WeightTitle}"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <TextBlock Text="{Binding QuoteDisplayValue}"
-                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Classes="caption"
                                                        Foreground="{Binding CurrentChangePercent, Converter={StaticResource PriceChangeColorConverter}}"/>
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="3" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                                            <TextBlock Text="当前浮动值" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="当前浮动值" Classes="caption"/>
                                             <TextBlock Text="{Binding FloatingValueText}"
                                                        FontFamily="{StaticResource DataFontFamily}"
                                                        FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="SemiBold"
+                                                       FontWeight="{DynamicResource WeightTitle}"
                                                        Foreground="{Binding FloatingValue, Converter={StaticResource PriceChangeColorConverter}}"/>
-                                            <TextBlock Text="{Binding QuoteStatusText}"
-                                                       FontSize="{StaticResource TinyFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding QuoteStatusText}" Classes="caption"/>
                                         </StackPanel>
 
+                                        <!-- 行容器是 ItemsControl + Border（无整行选中），开关可直接放行内 -->
                                         <ToggleSwitch Grid.Column="4"
                                                       Width="48"
                                                       VerticalAlignment="Center"
@@ -527,10 +438,10 @@
                                                 CommandParameter="{Binding Id}"
                                                 VerticalAlignment="Center"
                                                 ToolTip.Tip="删除">
+                                            <!-- 图标继承按钮前景：静止中性、悬停加深。删除的破坏性由确认弹窗承担，行内不常驻红色 -->
                                             <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
                                                       Width="{StaticResource TinyIconSize}"
-                                                      Height="{StaticResource TinyIconSize}"
-                                                      Foreground="{StaticResource ErrorBrush}"/>
+                                                      Height="{StaticResource TinyIconSize}"/>
                                         </Button>
                                     </Grid>
                                 </Border>
@@ -545,13 +456,12 @@
                                                RetryText="重新加载"
                                                ShowLoading="False"/>
                 </Grid>
-                </Grid>
-
-                <!-- 告警历史（仅在"告警历史"标签页显示） -->
-                <views:AlertHistoryView Grid.Row="1"
-                                        DataContext="{Binding AlertHistory}"
-                                        IsVisible="{Binding $parent[UserControl].((vm:PriceAlertPageViewModel)DataContext).IsHistoryTabSelected}"/>
             </Grid>
-        </controls:CardView>
-    </ScrollViewer>
+        </ScrollViewer>
+
+        <!-- ===== 告警历史 ===== -->
+        <views:AlertHistoryView Grid.Row="1"
+                                DataContext="{Binding AlertHistory}"
+                                IsVisible="{Binding $parent[UserControl].((vm:PriceAlertPageViewModel)DataContext).IsHistoryTabSelected}"/>
+    </Grid>
 </UserControl>

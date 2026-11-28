@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Applications.AssetScreener.Models;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Models;
@@ -21,10 +20,10 @@ public record InvestmentSelectionWorkflowRequest
     // 用户需求分析相关字段
     public string? Content { get; init; }
     public string? RiskPreference { get; init; }
-    public decimal? InvestmentAmount { get; init; }
-    public int? InvestmentHorizon { get; init; }
-    public List<string> PreferredSectors { get; init; } = [];
-    public List<string> ExcludedSectors { get; init; } = [];
+
+    /// <summary>
+    /// 第 3 步最多推荐的数量；不影响筛选候选池大小
+    /// </summary>
     public int MaxRecommendations { get; init; } = 10;
 }
 
@@ -37,6 +36,16 @@ public record CriteriaGenerationResult
     /// 生成的筛选条件（可以是 StockCriteria 或 CryptoCriteria）
     /// </summary>
     public object Criteria { get; init; } = new();
+
+    /// <summary>
+    /// 筛选条件个数（用于日志与进度摘要）
+    /// </summary>
+    public int CriteriaCount => Criteria switch
+    {
+        StockCriteria stock => stock.Criteria?.Count ?? 0,
+        CryptoCriteria crypto => crypto.Criteria?.Count ?? 0,
+        _ => 0
+    };
 
     /// <summary>
     /// 原始请求（用于传递到后续步骤）

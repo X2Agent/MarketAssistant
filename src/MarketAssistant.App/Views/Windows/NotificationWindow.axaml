@@ -1,7 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         x:Class="MarketAssistant.Views.Windows.NotificationWindow"
         Width="{StaticResource NotificationWidth}"
         Height="{StaticResource NotificationHeight}"
@@ -13,30 +11,31 @@
         Topmost="True"
         WindowStartupLocation="Manual">
 
-    <Border Name="NotificationBorder"
-            Background="{StaticResource NotificationDarkBackgroundBrush}"
-            BorderBrush="{StaticResource NotificationDarkBorderBrush}"
-            BorderThickness="{StaticResource DefaultBorderThickness}"
+    <!-- 悬浮通知：v3 唯一允许用重阴影的场景之一；无边框，靠表面色阶与阴影浮起 -->
+    <Border Background="{StaticResource NotificationDarkBackgroundBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
             CornerRadius="{StaticResource CardCornerRadius}"
             Padding="{StaticResource DefaultCardPadding}"
             Margin="{StaticResource SmallMargin}"
-            BoxShadow="{StaticResource NotificationBoxShadow}">
+            BoxShadow="{StaticResource ShadowModal}">
 
         <Grid ColumnDefinitions="Auto,*,Auto">
 
-            <!-- 图标区域：圆形语义色底，尺寸与标题字号协调 -->
-            <Border Grid.Column="0"
+            <!-- 图标区域：语义色圆角块 + 白色几何符号；底色与符号由 SetMessage 按通知类型切换 -->
+            <Border Name="StatusBadge"
+                    Grid.Column="0"
                     Width="{StaticResource MediumIconSize}"
                     Height="{StaticResource MediumIconSize}"
                     CornerRadius="{StaticResource NotificationIconCornerRadius}"
-                    Background="{StaticResource NotificationIconSuccessBrush}"
+                    Background="{DynamicResource SuccessBrush}"
                     VerticalAlignment="Center">
-                <TextBlock Text="✓"
-                           FontSize="{StaticResource SectionTitleFontSize}"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource TextOnEmphasisBrush}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"/>
+                <PathIcon Name="StatusIcon"
+                          Data="{StaticResource CheckIcon}"
+                          Width="{StaticResource TinyIconSize}"
+                          Height="{StaticResource TinyIconSize}"
+                          Foreground="{StaticResource TextOnEmphasisBrush}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"/>
             </Border>
 
             <!-- 消息内容 -->
@@ -48,27 +47,25 @@
                               HorizontalScrollBarVisibility="Disabled">
                     <TextBlock Name="MessageText"
                                Text="操作成功"
-                               FontSize="{StaticResource LabelFontSize}"
-                               FontWeight="Medium"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightEmphasis}"
                                Foreground="{StaticResource NotificationTextLightBrush}"
                                TextWrapping="Wrap"
-                               LineHeight="{StaticResource CompactLineHeight}"/>
+                               LineHeight="{StaticResource CaptionLineHeight}"/>
                 </ScrollViewer>
             </StackPanel>
 
             <!-- 关闭按钮 -->
             <Button Grid.Column="2"
                     Name="CloseButton"
-                    Content="✕"
                     Width="{StaticResource DefaultIconSize}"
                     Height="{StaticResource DefaultIconSize}"
-                    FontSize="{StaticResource MediumFontSize}"
                     Foreground="{StaticResource NotificationTextSecondaryBrush}"
                     Background="Transparent"
                     BorderThickness="{StaticResource NoBorderThickness}"
                     VerticalAlignment="Center"
                     Padding="{StaticResource NoPadding}"
-                    CornerRadius="{StaticResource DefaultCornerRadius}"
+                    CornerRadius="{StaticResource TinyCornerRadius}"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
                     Cursor="Hand">
@@ -82,6 +79,10 @@
                         <Setter Property="Foreground" Value="{StaticResource NotificationTextLightBrush}"/>
                     </Style>
                 </Button.Styles>
+                <!-- 关闭符号继承按钮前景色，悬停 / 按下时随按钮样式变亮 -->
+                <PathIcon Data="{StaticResource CloseIcon}"
+                          Width="{StaticResource MiniIconSize}"
+                          Height="{StaticResource MiniIconSize}"/>
             </Button>
         </Grid>
     </Border>

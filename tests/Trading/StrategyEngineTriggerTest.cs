@@ -187,12 +187,16 @@ public sealed class StrategyEngineTriggerTest
         var downCount = down.Count;
         var downSide = downCount > 0 ? down[0].EffectiveSide : default(OrderSide);
         var downQty = downCount > 0 ? down[0].EffectiveQuantity : 0m;
+        ctx.Data.Setup(d => d.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>())).ReturnsAsync([
+            new Position { Symbol = Symbol, StrategyId = strategy.Id, Side = PositionSide.Long, EntryPrice = 94m, Quantity = 0.4m }
+        ]);
         var up = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 106m);
 
         Assert.AreEqual(1, downCount, $"下穿应触发一次，落库参数: {persistedAfterDown}");
         Assert.AreEqual(OrderSide.Buy, downSide, "下穿网格线应买入");
         Assert.AreEqual(1m, downQty);
         Assert.HasCount(1, up);
+        Assert.AreEqual(0.4m, up[0].EffectiveQuantity);
         Assert.AreEqual(OrderSide.Sell, up[0].EffectiveSide, "上穿网格线应卖出");
         Assert.AreSame(strategy, down[0].Strategy, "策略本体不应被改写，仅有效字段承载触发值");
     }
@@ -242,12 +246,13 @@ public sealed class StrategyEngineTriggerTest
         strategy.LastTriggeredAt = DateTime.UtcNow;
         SetupStrategies(ctx, strategy);
 
+        // 出场评估自持仓行内计算加权均价（单条连接），EntryPrice 须随桩数据给出
         ctx.Data
             .Setup(data => data.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new Position { Symbol = Symbol, Side = PositionSide.Long, Quantity = 2m, ClosedQuantity = 0.5m }]);
-        ctx.Data
-            .Setup(data => data.GetOpenPositionAvgEntryPriceAsync(Symbol, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(100m);
+            .ReturnsAsync([new Position
+            {
+                Symbol = Symbol, Side = PositionSide.Long, Quantity = 2m, ClosedQuantity = 0.5m, EntryPrice = 100m
+            }]);
 
         // 115 >= 100 × (1 + 10%) → 止盈清仓剩余 1.5；出场评估不受定投间隔限制
         var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 115m);
@@ -276,10 +281,10 @@ public sealed class StrategyEngineTriggerTest
 
         ctx.Data
             .Setup(data => data.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new Position { Symbol = Symbol, Side = PositionSide.Long, Quantity = 1m, ClosedQuantity = 0m }]);
-        ctx.Data
-            .Setup(data => data.GetOpenPositionAvgEntryPriceAsync(Symbol, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(100m);
+            .ReturnsAsync([new Position
+            {
+                Symbol = Symbol, Side = PositionSide.Long, Quantity = 1m, ClosedQuantity = 0m, EntryPrice = 100m
+            }]);
 
         var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 79m);
 
@@ -308,10 +313,10 @@ public sealed class StrategyEngineTriggerTest
 
         ctx.Data
             .Setup(data => data.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new Position { Symbol = Symbol, Side = PositionSide.Long, Quantity = 1m, ClosedQuantity = 0m }]);
-        ctx.Data
-            .Setup(data => data.GetOpenPositionAvgEntryPriceAsync(Symbol, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(100m);
+            .ReturnsAsync([new Position
+            {
+                Symbol = Symbol, Side = PositionSide.Long, Quantity = 1m, ClosedQuantity = 0m, EntryPrice = 100m
+            }]);
 
         var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 79m);
 
@@ -354,5 +359,24 @@ public sealed class StrategyEngineTriggerTest
         ctx.Data.Verify(
             data => data.UpdateStrategyLastTriggeredAtAsync(strategy.Id, It.IsAny<CancellationToken>()),
             Times.Once, "触发时应立即持久化节流时间");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task AISignal_CorruptedParameters_ShouldNotBreakOtherStrategyEvaluation()
+    {
+        var ctx = CreateEngine();
+        var malformed = CreateStrategy(StrategyType.AISignal, OrderSide.Buy, "{broken");
+        malformed.LastTriggeredAt = DateTime.UtcNow.AddSeconds(-120);
+        var stopLoss = CreateStrategy(StrategyType.StopLoss, OrderSide.Sell);
+        stopLoss.TriggerPrice = 95m;
+        SetupStrategies(ctx, malformed, stopLoss);
+
+        var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 94m);
+
+        Assert.HasCount(2, triggered, "损坏 AI 参数应安全降级，不得阻断同标的其它策略评估");
+        ctx.Data.Verify(
+            data => data.UpdateStrategyLastTriggeredAtAsync(malformed.Id, It.IsAny<CancellationToken>()),
+            Times.Once, "损坏参数按默认间隔节流，不应每个 tick 重复解析失败");
     }
 }

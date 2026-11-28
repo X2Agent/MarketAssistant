@@ -10,7 +10,7 @@ namespace MarketAssistant.ViewModels;
 
 public partial class AboutPageViewModel : ViewModelBase
 {
-    private readonly IReleaseService _releaseService;
+    private readonly GitHubReleaseService _releaseService;
     private readonly INotificationService _notificationService;
     private ReleaseInfo? _latestRelease;
 
@@ -48,7 +48,7 @@ public partial class AboutPageViewModel : ViewModelBase
     public IRelayCommand OpenGitHubCommand { get; }
 
     public AboutPageViewModel(
-        IReleaseService releaseService,
+        GitHubReleaseService releaseService,
         INotificationService notificationService,
         ILogger<AboutPageViewModel> logger) : base(logger)
     {
@@ -57,7 +57,7 @@ public partial class AboutPageViewModel : ViewModelBase
 
         CheckUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         DownloadUpdateCommand = new AsyncRelayCommand(DownloadUpdateAsync, () => HasNewVersion && !IsDownloading);
-        OpenGitHubCommand = new RelayCommand(OpenGitHub);
+        OpenGitHubCommand = new RelayCommand(() => OpenUrl(AppInfo.GitHubRepoUrl));
 
         InitializeFeatureItems();
     }
@@ -94,22 +94,16 @@ public partial class AboutPageViewModel : ViewModelBase
                 }
                 else
                 {
-                    UpdateStatus = "已是最新版本 ✓";
+                    UpdateStatus = "已是最新版本";
                     _notificationService.ShowSuccess("当前已是最新版本！");
                     Logger?.LogInformation("当前已是最新版本");
                 }
             }
-            catch (FriendlyException ex)
-            {
-                UpdateStatus = $"检查更新失败：{ex.Message}";
-                _notificationService.ShowError($"检查更新失败：{ex.Message}");
-                Logger?.LogError(ex, "检查更新失败");
-            }
             catch (Exception ex)
             {
-                UpdateStatus = "检查更新失败";
-                _notificationService.ShowError("检查更新失败，请稍后重试");
-                Logger?.LogError(ex, "检查更新时发生未知错误");
+                UpdateStatus = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "检查更新");
+                _notificationService.ShowError(UpdateStatus);
+                Logger?.LogError(ex, "检查更新失败");
             }
             finally
             {
@@ -193,17 +187,11 @@ public partial class AboutPageViewModel : ViewModelBase
                 _notificationService.ShowWarning("下载已取消");
                 Logger?.LogWarning("下载已取消");
             }
-            catch (FriendlyException ex)
-            {
-                UpdateStatus = $"下载失败：{ex.Message}";
-                _notificationService.ShowError($"下载失败：{ex.Message}");
-                Logger?.LogError(ex, "下载更新失败");
-            }
             catch (Exception ex)
             {
-                UpdateStatus = "下载失败";
-                _notificationService.ShowError("下载失败，请稍后重试或手动访问 GitHub 下载");
-                Logger?.LogError(ex, "下载更新时发生未知错误");
+                UpdateStatus = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "下载");
+                _notificationService.ShowError(UpdateStatus);
+                Logger?.LogError(ex, "下载更新失败");
             }
             finally
             {
@@ -212,20 +200,6 @@ public partial class AboutPageViewModel : ViewModelBase
                 DownloadUpdateCommand.NotifyCanExecuteChanged();
             }
         }, "下载更新");
-    }
-
-    private void OpenGitHub()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(AppInfo.GitHubRepoUrl) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            // 打开浏览器失败不影响主流程，记录日志即可
-            Logger?.LogWarning(ex, "打开 GitHub 仓库页面失败: {Url}", AppInfo.GitHubRepoUrl);
-            _notificationService.ShowWarning("无法打开浏览器，请手动访问 GitHub 仓库");
-        }
     }
 
     /// <summary>
@@ -290,8 +264,9 @@ public partial class AboutPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            // 打开链接失败不影响主流程，记录日志即可
+            // 打开链接失败不影响主流程，记录日志并提示用户手动访问
             Logger?.LogWarning(ex, "打开链接失败: {Url}", url);
+            _notificationService.ShowWarning($"无法打开浏览器，请手动访问：{url}");
         }
     }
 

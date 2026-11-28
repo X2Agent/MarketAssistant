@@ -13,8 +13,6 @@ public static class RagDocumentId
 {
     public static string Compute(string filePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-
         var fullPath = Path.GetFullPath(filePath);
         var normalized = fullPath.Replace('\\', '/');
 

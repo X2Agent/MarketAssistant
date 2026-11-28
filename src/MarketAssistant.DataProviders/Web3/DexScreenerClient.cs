@@ -10,8 +10,8 @@ namespace MarketAssistant.DataProviders.Web3;
 /// </summary>
 public sealed class DexScreenerClient(IHttpClientFactory httpClientFactory, ILogger<DexScreenerClient> logger)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly ILogger<DexScreenerClient> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<DexScreenerClient> _logger = logger;
 
     /// <summary>
     /// 按关键字搜索 DEX 交易对（代币符号/名称/合约地址均可）。

@@ -13,19 +13,18 @@ public static class TokenEstimator
     private static readonly ITokenCounter Counter = new TiktokenTokenCounter();
 
     /// <summary>
-    /// 估算单条消息的 Token 数
+    /// 估算单条消息的 Token 数（空文本与 null 均计为 0，估算场景下语义等价）
     /// </summary>
     public static int EstimateTokens(ChatMessage message)
     {
-        var text = message.Text ?? string.Empty;
-        return EstimateTokens(text);
+        return EstimateTokens(message.Text);
     }
 
     /// <summary>
     /// 估算文本的 Token 数
     /// </summary>
-    public static int EstimateTokens(string text)
-        => Counter.CountTokens(text);
+    public static int EstimateTokens(string? text)
+        => string.IsNullOrEmpty(text) ? 0 : Counter.CountTokens(text);
 
     /// <summary>
     /// 估算对话历史的总 Token 数

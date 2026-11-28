@@ -3,6 +3,9 @@ using System.Text;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services;
+using MarketAssistant.Services.Settings;
+using MarketAssistant.Applications.Settings;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Moq;
@@ -12,6 +15,22 @@ namespace TestMarketAssistant.Infrastructure;
 [TestClass]
 public class ModelDiscoveryServiceTest
 {
+    [TestMethod, TestCategory("Unit")]
+    public async Task OllamaRuntimeSendsChatThroughConfiguredTransport()
+    {
+        var handler = new RecordingHandler("""{"model":"probe","message":{"role":"assistant","content":"ok"},"done":true}""");
+        var services = new ServiceCollection();
+        services.AddNamedMarketHttpClients();
+        services.AddHttpClient("Ollama").ConfigurePrimaryHttpMessageHandler(() => handler);
+        using var provider = services.BuildServiceProvider();
+        var settings = new UserSetting { ProviderId = "Ollama" };
+        settings.ProviderModelIds["Ollama"] = "probe";
+        settings.ProviderEndpoints["Ollama"] = "http://localhost:12345";
+        using var factory = new ChatClientFactory(Mock.Of<IUserSettingService>(s => s.CurrentSetting == settings), provider.GetRequiredService<IHttpClientFactory>());
+        var response = await factory.CreateClient().GetResponseAsync("test");
+        Assert.AreEqual("http://localhost:12345/api/chat", handler.Request?.RequestUri?.AbsoluteUri);
+        Assert.AreEqual("ok", response.Text);
+    }
     [TestMethod]
     [TestCategory("Unit")]
     public async Task ListModelsAsync_AnonymousProvider_ShouldReturnCompleteDirectoryWithoutAuthorization()

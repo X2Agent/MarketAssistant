@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -142,33 +141,7 @@ public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<C
 """;
     }
 
-    public override string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
-    {
-        if (request.IsNewsAnalysis)
-        {
-            return $"""
-                新闻内容：
-                {request.Content}
-
-                推荐虚拟币数量限制：{request.MaxRecommendations}
-
-                请根据新闻内容生成虚拟币筛选条件。
-                """;
-        }
-        else
-        {
-            return $"""
-                用户需求：
-                {request.Content}
-
-                推荐虚拟币数量限制：{request.MaxRecommendations}
-
-                请根据用户需求生成虚拟币筛选条件。
-                """;
-        }
-    }
-
-    public override CryptoCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
+    public override CryptoCriteria DeserializeCriteria(string json)
     {
         var criteria = LlmJsonExtractor.Deserialize<CryptoCriteria>(json, DeserializationOptions);
         if (criteria == null)
@@ -187,7 +160,7 @@ public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<C
             ValidateCondition(condition.Code, condition.MinValue, condition.MaxValue, index);
         }
 
-        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
+        criteria.Limit = IScreeningCriteria.CandidatePoolSize;
         return criteria;
     }
 

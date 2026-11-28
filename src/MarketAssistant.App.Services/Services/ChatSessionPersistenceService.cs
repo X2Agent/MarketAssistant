@@ -9,7 +9,7 @@ namespace MarketAssistant.Services;
 /// <summary>
 /// 聊天会话持久化服务，支持将对话历史保存到 SQLite 并在应用重启后恢复。
 /// </summary>
-public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService> logger) : SqliteServiceBase(logger)
+public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService> logger, string? dbPath = null) : SqliteServiceBase(logger, dbPath)
 {
 
     /// <summary>
@@ -123,6 +123,7 @@ public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService
     private static ChatSessionSnapshot ReadSnapshot(SqliteDataReader reader)
     {
         var messagesJson = reader.GetString(reader.GetOrdinal("messages_json"));
+        // 消息列合法取值包含 JSON null（空会话），视同无消息；非法 JSON 由 Deserialize 抛出
         var messages = JsonSerializer.Deserialize<List<ChatMessageDto>>(messagesJson) ?? [];
 
         var contextOrd = reader.GetOrdinal("analysis_context");
@@ -280,47 +281,39 @@ public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService
 
     protected override async Task InitializeDatabaseAsync()
     {
-        try
-        {
-            await using var conn = await OpenConnectionAsync();
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS chat_sessions (
-                    id TEXT PRIMARY KEY,
-                    stock_code TEXT NOT NULL,
-                    title TEXT NOT NULL,
-                    messages_json TEXT NOT NULL,
-                    analysis_context TEXT,
-                    agent_session_json TEXT,
-                    session_schema_version INTEGER NOT NULL DEFAULT 0,
-                    provider_id TEXT NOT NULL DEFAULT '',
-                    model_id TEXT NOT NULL DEFAULT '',
-                    endpoint TEXT NOT NULL DEFAULT '',
-                    runtime_configuration_fingerprint TEXT NOT NULL DEFAULT '',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_chat_sessions_stock ON chat_sessions(stock_code);
-                CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at);
+        await using var conn = await OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id TEXT PRIMARY KEY,
+                stock_code TEXT NOT NULL,
+                title TEXT NOT NULL,
+                messages_json TEXT NOT NULL,
+                analysis_context TEXT,
+                agent_session_json TEXT,
+                session_schema_version INTEGER NOT NULL DEFAULT 0,
+                provider_id TEXT NOT NULL DEFAULT '',
+                model_id TEXT NOT NULL DEFAULT '',
+                endpoint TEXT NOT NULL DEFAULT '',
+                runtime_configuration_fingerprint TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_stock ON chat_sessions(stock_code);
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at);
 
-                CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts USING fts5(
-                    session_id UNINDEXED,
-                    role UNINDEXED,
-                    content,
-                    author_name UNINDEXED,
-                    message_index UNINDEXED,
-                    tokenize='unicode61'
-                );
-                """;
-            await cmd.ExecuteNonQueryAsync();
-            await EnsureSessionColumnsAsync(conn);
-            Logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引与 MAF Session 状态）");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "初始化聊天会话数据库失败");
-            throw;
-        }
+            CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts USING fts5(
+                session_id UNINDEXED,
+                role UNINDEXED,
+                content,
+                author_name UNINDEXED,
+                message_index UNINDEXED,
+                tokenize='unicode61'
+            );
+            """;
+        await cmd.ExecuteNonQueryAsync();
+        await EnsureSessionColumnsAsync(conn);
+        Logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引与 MAF Session 状态）");
     }
 }
 

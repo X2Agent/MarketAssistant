@@ -2,14 +2,14 @@ using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Data;
-using Microsoft.SemanticKernel.Plugins.Web.Bing;
 using Microsoft.SemanticKernel.Plugins.Web.Brave;
 using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
 /// <summary>
-/// Web 搜索服务：按用户设置选择 Bing/Brave/Tavily 提供商并执行搜索。
+/// Web 搜索服务：按用户设置选择 Brave/Tavily 提供商并执行搜索。
+/// 搜索失败直接上抛，由调用方区分「检索失败」与「无结果」。
 /// </summary>
 public class WebSearchService(IUserSettingService userSettingService, ILogger<WebSearchService> logger) : IWebSearchService
 {
@@ -23,22 +23,12 @@ public class WebSearchService(IUserSettingService userSettingService, ILogger<We
             return [];
         }
 
-        try
+        return setting.WebSearchProvider?.ToLowerInvariant() switch
         {
-            var results = setting.WebSearchProvider?.ToLowerInvariant() switch
-            {
-                "bing" => await SearchAsync(new BingTextSearch(apiKey: setting.WebSearchApiKey), query, top, cancellationToken),
-                "brave" => await SearchAsync(new BraveTextSearch(apiKey: setting.WebSearchApiKey), query, top, cancellationToken),
-                "tavily" => await SearchAsync(new TavilyTextSearch(apiKey: setting.WebSearchApiKey), query, top, cancellationToken),
-                _ => []
-            };
-            return results;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "网络搜索失败: {Query}", query);
-            return [];
-        }
+            "brave" => await SearchAsync(new BraveTextSearch(apiKey: setting.WebSearchApiKey), query, top, cancellationToken),
+            "tavily" => await SearchAsync(new TavilyTextSearch(apiKey: setting.WebSearchApiKey), query, top, cancellationToken),
+            _ => throw new InvalidOperationException($"不支持的网络搜索提供商: {setting.WebSearchProvider}")
+        };
     }
 
     private static async Task<IReadOnlyList<TextSearchResult>> SearchAsync<TRecord>(

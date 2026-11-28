@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -98,7 +97,7 @@ public sealed class TradingEnvironmentService(
     public static string GetModeDescription(TradingMode mode) => mode switch
     {
         TradingMode.LiveSpot => "订单会直接发送到 Binance 现货账户，请确认 API Key 权限与账户余额。",
-        TradingMode.LiveFutures => "订单会直接发送到 Binance U本位合约账户，支持双向持仓与杠杆。请确认 API Key 已开启合约权限。",
+        TradingMode.LiveFutures => "订单会直接发送到 Binance U本位合约账户，仅支持单向持仓模式。请确认 API Key 已开启合约权限。",
         TradingMode.FuturesTestnet => "订单会发送到 Binance Futures Testnet (demo-fapi.binance.com)。资产为虚拟资产，用于合约策略验证。",
         TradingMode.SpotDemo => "订单会发送到 Binance 现货 Demo 环境 (demo-api.binance.com)。使用实盘账户的虚拟余额，适合策略验证。",
         _ => "订单会直接发送到 Binance 现货账户，请确认 API Key 权限与账户余额。"

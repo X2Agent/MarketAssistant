@@ -27,7 +27,7 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
         // Investment Rating & Score
         var rating = GetEnumDescription(model.InvestmentRating);
         var score = model.OverallScore.ToString("F1");
-        var color = rating.Contains("买入", StringComparison.Ordinal) ? AdaptiveTextColor.Good : (rating.Contains("卖出", StringComparison.Ordinal) ? AdaptiveTextColor.Attention : AdaptiveTextColor.Warning);
+        var color = DirectionColor(rating, AdaptiveTextColor.Warning);
 
         // 1. 综合评分看板
         var scoreContainer = new AdaptiveContainer { Style = AdaptiveContainerStyle.Emphasis, Spacing = AdaptiveSpacing.Medium };
@@ -49,6 +49,7 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
             scoreCols.Columns.Add(new AdaptiveColumn
             {
                 Width = "stretch",
+                Spacing = AdaptiveSpacing.Medium,
                 VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
                 Items = { new AdaptiveTextBlock { Text = model.Summary, Wrap = true, Weight = AdaptiveTextWeight.Bolder } }
             });
@@ -63,7 +64,7 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
         {
             facts.Facts.Add(new AdaptiveFact("预期涨幅", model.PriceChangeExpectation));
         }
-        facts.Facts.Add(new AdaptiveFact("投资周期", model.TimeHorizonDescription));
+        facts.Facts.Add(new AdaptiveFact("投资周期", model.DescribeTimeHorizon()));
         facts.Facts.Add(new AdaptiveFact("置信度", model.ConfidencePercentage.ToString("F0") + "%"));
         facts.Facts.Add(new AdaptiveFact("风险等级", GetEnumDescription(model.RiskLevel)));
         AddFactSection(card.Body, "关键参数", facts);

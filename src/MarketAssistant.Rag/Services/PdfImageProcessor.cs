@@ -9,7 +9,7 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 internal sealed class PdfImageProcessor(IImageStorageService imageStorageService)
 {
-    private readonly IImageStorageService _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
+    private readonly IImageStorageService _imageStorageService = imageStorageService;
 
     public async Task ProcessPageImages(PdfPage page, StringBuilder markdown, int pageNumber, string filePath)
     {

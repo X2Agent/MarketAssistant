@@ -121,13 +121,13 @@ public partial class SettingsPageViewModel
             VectorizingProgress = 100;
             if (result.AllSucceeded)
             {
-                VectorizingProgressText = $"✅ 全部完成！共 {result.SuccessCount} 个文件";
-                _notificationService.ShowSuccess($"✅ 所有文档向量化完成！\n成功处理 {result.SuccessCount} 个文件");
+                VectorizingProgressText = $"全部完成！共 {result.SuccessCount} 个文件";
+                _notificationService.ShowSuccess($"所有文档向量化完成！\n成功处理 {result.SuccessCount} 个文件");
                 Logger?.LogInformation("向量化完成：成功 {Success}/{Total} 个", result.SuccessCount, result.TotalCount);
             }
             else
             {
-                var summaryText = $"⚠️ 完成（存在失败）: {result.SuccessCount} 成功, {result.PartialCount} 部分成功, {result.FailedCount} 失败";
+                var summaryText = $"完成（存在失败）: {result.SuccessCount} 成功, {result.PartialCount} 部分成功, {result.FailedCount} 失败";
                 VectorizingProgressText = summaryText;
 
                 var failedList = string.Join("\n- ", result.FailedFiles.Take(5));
@@ -143,7 +143,7 @@ public partial class SettingsPageViewModel
                 }
 
                 _notificationService.ShowWarning(
-                    $"向量化完成：\n✓ 完全成功 {result.SuccessCount} 个\n△ 部分成功 {result.PartialCount} 个\n✗ 失败 {result.FailedCount} 个" +
+                    $"向量化完成：\n完全成功 {result.SuccessCount} 个\n部分成功 {result.PartialCount} 个\n失败 {result.FailedCount} 个" +
                     (result.PartialFiles.Count > 0 ? $"\n\n部分成功（存在失败块）：\n- {partialList}" : string.Empty) +
                     (result.FailedFiles.Count > 0 ? $"\n\n失败文件：\n- {failedList}" : string.Empty));
 

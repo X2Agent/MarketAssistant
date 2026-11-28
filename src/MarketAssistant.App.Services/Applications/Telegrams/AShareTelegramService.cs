@@ -73,7 +73,7 @@ public class AShareTelegramService(ILogger<AShareTelegramService> logger, IHttpC
                 var stocks = (item.Stock ?? [])
                     .Select(s => s.Name?.Trim())
                     .Where(s => !string.IsNullOrWhiteSpace(s))
-                    .Select(s => s!)
+                    .OfType<string>()
                     .ToList();
 
                 result.Add(new Telegram

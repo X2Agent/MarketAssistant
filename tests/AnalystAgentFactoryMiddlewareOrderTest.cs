@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Analysts;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Infrastructure.Core;
@@ -68,6 +69,29 @@ public sealed class AnalystAgentFactoryMiddlewareOrderTest : BaseAgentTest
         Assert.Contains(FailureReason, exception.Message);
     }
 
+    /// <summary>
+    /// MAF 契约依赖：ChatClientAgent 未显式提供 ChatClient 时会自动插入
+    /// FunctionInvokingChatClient 执行工具调用。工具失败原因必须回传模型
+    /// （IncludeDetailedErrors），否则模型只能看到 "Error: Function failed."，
+    /// 无法据此换参数重试或在结论中如实标注数据不可用。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void AnalystAgentBase_InnerChatPipeline_ExposesDetailedToolErrors()
+    {
+        var probe = new ToolErrorVisibilityProbeAgent(new ThrowingChatClient());
+
+        Assert.IsInstanceOfType(probe.ProbeInnerAgent, typeof(ChatClientAgent));
+        var chatClientAgent = (ChatClientAgent)probe.ProbeInnerAgent;
+
+        // 管道可能在 FIC 外还有别的包装层（如 ApprovalResponseBindingChatClient），
+        // 经 GetService 沿管道向内解析——与 MAF 内部的工具注入路径一致
+        var fic = chatClientAgent.ChatClient.GetService(typeof(FunctionInvokingChatClient));
+        Assert.IsInstanceOfType(fic, typeof(FunctionInvokingChatClient));
+        Assert.IsTrue(((FunctionInvokingChatClient)fic!).IncludeDetailedErrors,
+            "分析师管道的 FunctionInvokingChatClient 必须开启 IncludeDetailedErrors");
+    }
+
     private AnalystAgentFactory CreateFactory()
     {
         return new AnalystAgentFactory(
@@ -110,5 +134,13 @@ public sealed class AnalystAgentFactoryMiddlewareOrderTest : BaseAgentTest
         public void Dispose()
         {
         }
+    }
+
+    /// <summary>探针：仅用于检查 <see cref="AnalystAgentBase"/> 内层管道配置，不经工厂。</summary>
+    private sealed class ToolErrorVisibilityProbeAgent(IChatClient chatClient)
+        : AnalystAgentBase(chatClient, "探针指令", "ToolErrorVisibilityProbe", "管道配置探针", 0.1f, 0.1f,
+            topK: null, typeof(FinancialAnalysisResult), StructuredOutputMode.JsonObject, tools: null)
+    {
+        public AIAgent ProbeInnerAgent => InnerAgent;
     }
 }

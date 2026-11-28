@@ -3,6 +3,7 @@ using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
+using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Core;
@@ -119,7 +120,6 @@ public sealed class StructuredOutputTest
     public void StockCriteriaStrategy_ShouldRejectUnsupportedIndicator()
     {
         var strategy = new StockCriteriaGenerationStrategy();
-        var request = new InvestmentSelectionWorkflowRequest { MaxRecommendations = 5 };
         const string json = """
             {
               "criteria": [
@@ -132,16 +132,15 @@ public sealed class StructuredOutputTest
             """;
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => strategy.DeserializeCriteria(json, request));
+            () => strategy.DeserializeCriteria(json));
 
         Assert.Contains("不支持的指标", exception.Message);
     }
 
     [TestMethod]
-    public void StockCriteriaStrategy_ShouldUseRequestLimit()
+    public void StockCriteriaStrategy_ShouldUseFixedCandidatePool()
     {
         var strategy = new StockCriteriaGenerationStrategy();
-        var request = new InvestmentSelectionWorkflowRequest { MaxRecommendations = 4 };
         const string json = """
             {
               "criteria": [
@@ -153,16 +152,34 @@ public sealed class StructuredOutputTest
             }
             """;
 
-        var criteria = strategy.DeserializeCriteria(json, request);
+        var criteria = strategy.DeserializeCriteria(json);
 
-        Assert.AreEqual(4, criteria.Limit);
+        // 候选池与推荐数量解耦：模型输出的 limit 不影响筛选池大小
+        Assert.AreEqual(IScreeningCriteria.CandidatePoolSize, criteria.Limit);
+    }
+
+    [TestMethod]
+    public void CryptoCriteriaStrategy_ShouldUseFixedCandidatePool()
+    {
+        var strategy = new CryptoCriteriaGenerationStrategy();
+        const string json = """
+            {
+              "criteria": [
+                { "code": "market_cap_rank", "maxValue": 50 }
+              ],
+              "limit": 5
+            }
+            """;
+
+        var criteria = strategy.DeserializeCriteria(json);
+
+        Assert.AreEqual(IScreeningCriteria.CandidatePoolSize, criteria.Limit);
     }
 
     [TestMethod]
     public void CryptoCriteriaStrategy_ShouldRejectInvalidRange()
     {
         var strategy = new CryptoCriteriaGenerationStrategy();
-        var request = new InvestmentSelectionWorkflowRequest { MaxRecommendations = 5 };
         const string json = """
             {
               "criteria": [
@@ -173,9 +190,66 @@ public sealed class StructuredOutputTest
             """;
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => strategy.DeserializeCriteria(json, request));
+            () => strategy.DeserializeCriteria(json));
 
         Assert.Contains("不能大于最大值", exception.Message);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void UserPrompt_ShouldNotCoupleCriteriaGenerationToRecommendationCount()
+    {
+        var request = new InvestmentSelectionWorkflowRequest { Content = "找低估值蓝筹", MaxRecommendations = 3 };
+
+        var stockPrompt = new StockCriteriaGenerationStrategy().BuildUserPrompt(request);
+        var cryptoPrompt = new CryptoCriteriaGenerationStrategy().BuildUserPrompt(request);
+
+        Assert.Contains("找低估值蓝筹", stockPrompt);
+        Assert.Contains("股票筛选条件", stockPrompt);
+        Assert.Contains("虚拟币筛选条件", cryptoPrompt);
+        Assert.DoesNotContain("数量限制", stockPrompt);
+        Assert.DoesNotContain("数量限制", cryptoPrompt);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("0.00000345", true, DisplayName = "PEPE 级低价币目标价")]
+    [DataRow("0.0000036", true, DisplayName = "SHIB 级低价币止损价")]
+    [DataRow("0.00000001", true, DisplayName = "下界本身")]
+    [DataRow("0.012", true, DisplayName = "原先下界附近的普通价格")]
+    [DataRow("0", false, DisplayName = "0 不是合法价格")]
+    public void InvestmentRecommendation_PriceRange_ShouldAcceptLowPriceCoins(string price, bool expectedValid)
+    {
+        var value = decimal.Parse(price, System.Globalization.CultureInfo.InvariantCulture);
+        var recommendation = new InvestmentRecommendation
+        {
+            Symbol = "PEPE",
+            Name = "Pepe",
+            RecommendationScore = 70,
+            Reason = "24h 成交额 2.1 亿美元、市值排名第 45，7 天涨幅 12.5%，流动性充足；但属于 meme 币，价格波动剧烈，仓位应严格控制。",
+            RiskLevel = RiskLevel.High,
+            TargetPrice = value,
+            StopLoss = value
+        };
+
+        var errors = StructuredOutputValidator.Validate(recommendation);
+
+        Assert.AreEqual(expectedValid, errors.Count == 0, string.Join("; ", errors));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void InvestmentSelectionResult_Schema_ShouldNotExposeBackfilledFields()
+    {
+        var instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            "base instructions",
+            typeof(InvestmentSelectionResult),
+            StructuredOutputMode.Text);
+
+        Assert.Contains("recommendations", instructions);
+        // 由 Executor 回填的字段不属于 LLM 输出契约
+        Assert.DoesNotContain("appliedCriteria", instructions, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("currentPrice", instructions, StringComparison.OrdinalIgnoreCase);
     }
 
     [TestMethod]
@@ -200,13 +274,14 @@ public sealed class StructuredOutputTest
             .Select(descriptor => descriptor.ImplementationType)
             .ToHashSet();
 
-        Assert.HasCount(6, parserRegistrations);
+        Assert.HasCount(7, parserRegistrations);
         Assert.Contains(typeof(CoordinatorCardParser), parserRegistrations);
         Assert.Contains(typeof(FinancialCardParser), parserRegistrations);
         Assert.Contains(typeof(FundamentalCardParser), parserRegistrations);
         Assert.Contains(typeof(SentimentCardParser), parserRegistrations);
         Assert.Contains(typeof(NewsCardParser), parserRegistrations);
         Assert.Contains(typeof(TechnicalCardParser), parserRegistrations);
+        Assert.Contains(typeof(CryptoMetricsCardParser), parserRegistrations);
 
         // 转换器消费整条解析器责任链，必须与解析器同容器注册
         Assert.Contains(descriptor => descriptor.ServiceType == typeof(AdaptiveCardConverter), services);

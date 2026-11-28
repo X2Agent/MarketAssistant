@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
-using System.Text.Json;
 using MarketAssistant.Applications.AlertCenter;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Trading.Exchanges;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
@@ -26,6 +24,15 @@ public class TradeExecutor(
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _symbolExecutionLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 按标的获取执行串行锁（单例字典，调用方共享同一把锁）。
+    /// 键统一规范化为大写去空白：下单、条件单挂单、持仓对账都用同一把锁，
+    /// 防止"对账读到旧持仓快照 → 交易成交落库 → 对账把成交覆盖回旧值"的竞态。
+    /// </summary>
+    internal SemaphoreSlim GetExecutionGate(string instrumentSymbol)
+        => _symbolExecutionLocks.GetOrAdd(
+            instrumentSymbol.Trim().ToUpperInvariant(), _ => new SemaphoreSlim(1, 1));
+
     private readonly IExchangeClient _exchangeClient = exchangeClient;
     private readonly TradingEnvironmentService? _environmentService = environmentService;
     private readonly RiskManager _riskManager = riskManager;
@@ -41,6 +48,12 @@ public class TradeExecutor(
     /// 未订阅时保持现有行为（直接拒绝）。
     /// </summary>
     public event Func<string, OrderSide, decimal, decimal, string, Task<bool>>? ConfirmationRequested;
+
+    /// <summary>
+    /// 当前是否为合约模式（由活跃交易所客户端决定）。供策略执行器决定语义：
+    /// 合约允许双向开仓，现货的 SELL 只能是离场，无法开空。
+    /// </summary>
+    public bool IsFuturesMode => _exchangeClient.IsFutures;
 
     /// <summary>
     /// 执行策略触发的交易（兼容包装，委托给 <see cref="ExecuteTriggeredTradeAsync"/>）。
@@ -122,6 +135,18 @@ public class TradeExecutor(
         => ConditionOrderClientOrderIdPrefix + strategyId + (leg == ConditionOrderLeg.Stop ? "S" : "T");
 
     /// <summary>
+    /// 普通下单的 clientOrderId 前缀（条件单用 "MC"）。
+    /// </summary>
+    public const string OrderClientOrderIdPrefix = "MA";
+
+    /// <summary>
+    /// 生成一次性幂等下单 ID（"MA" + 16 位 hex，总长 18 ≤ 币安 36 字符上限）。
+    /// 同时作为本地下单意图主键，响应丢失时仅按此 ID 查询。
+    /// </summary>
+    internal static string BuildClientOrderId()
+        => OrderClientOrderIdPrefix + Convert.ToHexString(Guid.NewGuid().ToByteArray())[..16].ToLowerInvariant();
+
+    /// <summary>
     /// 解析追踪止损的回调基点（1% = 100 基点）：优先 CustomParams.trailingPercent，
     /// 缺失时按风险档案兜底（与策略引擎的回退规则一致）。
     /// </summary>
@@ -144,8 +169,11 @@ public class TradeExecutor(
         }
 
         if (trailingPercent <= 0)
+        {
+            AISignalParams.TryFromJson(strategy.CustomParams, out var aiParams);
             trailingPercent = ScenarioPresets.GetTrailingPercent(
-                AISignalParams.FromJson(strategy.CustomParams)?.ParsedRiskProfile ?? RiskProfile.Balanced);
+                aiParams?.ParsedRiskProfile ?? RiskProfile.Balanced);
+        }
 
         return decimal.ToInt32(trailingPercent * 100);
     }
@@ -154,9 +182,16 @@ public class TradeExecutor(
     /// 由策略参数与腿别推导条件单规格（方向/订单类型/触发价/回调基点）。
     /// 返回 error 非空表示该策略无法挂条件单（调用方以客户端评估兜底）。
     /// </summary>
+    /// <param name="isFutures">
+    /// 合约用 STOP_MARKET / TAKE_PROFIT_MARKET；现货用 STOP_LOSS / TAKE_PROFIT——
+    /// 币安现货这两种类型触发后同样以 MARKET 成交，不存在"限价=触发价跳空后挂盘不成交"的风险。
+    /// </param>
     internal static (OrderSide Side, OrderType? Type, decimal? StopPrice, int? TrailingDelta, string? Error)
-        BuildConditionOrderSpec(TradingStrategy strategy, ConditionOrderLeg leg)
+        BuildConditionOrderSpec(TradingStrategy strategy, ConditionOrderLeg leg, bool isFutures = true)
     {
+        var stopType = isFutures ? OrderType.StopMarket : OrderType.StopLoss;
+        var takeProfitType = isFutures ? OrderType.TakeProfitMarket : OrderType.TakeProfit;
+
         // AI 信号策略的固定护栏：方向取入场方向的反向（多头入场→卖出离场）
         if (strategy.Type == StrategyType.AISignal)
         {
@@ -166,12 +201,12 @@ public class TradeExecutor(
             {
                 if (strategy.StopLossPrice <= 0)
                     return (exitSide, null, null, null, $"AI 策略缺少止损价，无法挂止损腿: {strategy.Id}");
-                return (exitSide, OrderType.StopMarket, strategy.StopLossPrice, null, null);
+                return (exitSide, stopType, strategy.StopLossPrice, null, null);
             }
 
             if (strategy.TakeProfitPrice <= 0)
                 return (exitSide, null, null, null, $"AI 策略缺少止盈价，无法挂止盈腿: {strategy.Id}");
-            return (exitSide, OrderType.TakeProfitMarket, strategy.TakeProfitPrice, null, null);
+            return (exitSide, takeProfitType, strategy.TakeProfitPrice, null, null);
         }
 
         switch (strategy.Type)
@@ -179,14 +214,18 @@ public class TradeExecutor(
             case StrategyType.StopLoss:
                 if (strategy.TriggerPrice <= 0)
                     return (strategy.Side, null, null, null, $"止损策略缺少触发价，无法挂条件单: {strategy.Id}");
-                return (strategy.Side, OrderType.StopMarket, strategy.TriggerPrice, null, null);
+                return (strategy.Side, stopType, strategy.TriggerPrice, null, null);
 
             case StrategyType.TakeProfit when strategy.Side == OrderSide.Sell && leg == ConditionOrderLeg.TakeProfit:
                 if (strategy.TriggerPrice <= 0)
                     return (strategy.Side, null, null, null, $"止盈策略缺少触发价，无法挂条件单: {strategy.Id}");
-                return (strategy.Side, OrderType.TakeProfitMarket, strategy.TriggerPrice, null, null);
+                return (strategy.Side, takeProfitType, strategy.TriggerPrice, null, null);
 
             case StrategyType.TrailingStop:
+                // 现货无 TRAILING_STOP_MARKET：追踪止损在现货只能由客户端评估兜底
+                if (!isFutures)
+                    return (strategy.Side, null, null, null,
+                        $"现货不支持追踪止损条件单，改由客户端评估保护: {strategy.Id}");
                 var bps = ResolveTrailingDeltaBasisPoints(strategy);
                 // 币安 TrailingStopMarket 回调比例有效范围 0.1%-10%（10-1000 基点）
                 if (bps is < 10 or > 1000)
@@ -201,49 +240,45 @@ public class TradeExecutor(
     }
 
     /// <summary>
-    /// 为退出型策略挂交易所侧 reduceOnly 条件单（仅合约），按腿别挂单：
-    /// 止损腿（StopMarket / TrailingStopMarket）与止盈腿（TakeProfitMarket）。
+    /// 为退出型策略挂交易所侧条件单，按腿别挂单：合约为 reduceOnly 的
+    /// StopMarket / TrailingStopMarket / TakeProfitMarket，现货为 STOP_LOSS / TAKE_PROFIT
+    /// （触发即市价，现货无 reduceOnly 语义——卖出单本身就是减仓）。
     /// 保护性离场不受风控确认与告警联动门限制（与 requireClose 豁免同一原则）；
     /// 挂单本身无成交，持仓 FIFO 与日统计由订单对账路径在成交后回写，
     /// 策略完结由 MarketMonitor 的条件单成交事件驱动。
-    /// 现货模式直接拒绝（调用方以客户端评估兜底）。
+    /// 现货 AI 策略的"双腿"保护走 <see cref="PlaceSpotProtectiveOcoAsync"/>（OCO 单），
+    /// 单腿或合约场景走本方法。
     /// </summary>
+    /// <param name="quantityOverride">
+    /// 挂单数量覆盖（默认取 strategy.Quantity）。AI 策略由对账方按实际持仓余量传入，
+    /// 防止"挂单成交后部分平仓/加仓导致 strategy.Quantity 与实际持仓漂移"时超量卖出。
+    /// </param>
     public virtual async Task<TradeResult> PlaceConditionOrderAsync(
-        TradingStrategy strategy, ConditionOrderLeg leg, CancellationToken ct = default)
+        TradingStrategy strategy, ConditionOrderLeg leg,
+        decimal? quantityOverride = null, CancellationToken ct = default)
     {
         var exchangeClient = ResolveClientSnapshot();
-        if (!exchangeClient.IsFutures)
-            return new TradeResult
-            {
-                Success = false,
-                ErrorMessage = "条件单兜底仅支持合约模式",
-                FailureCategory = TradeFailureCategory.Rejected
-            };
+        var isFutures = exchangeClient.IsFutures;
+        var quantity = quantityOverride ?? strategy.Quantity;
 
-        var (side, orderType, stopPrice, trailingDelta, error) = BuildConditionOrderSpec(strategy, leg);
+        var (side, orderType, stopPrice, trailingDelta, error) =
+            BuildConditionOrderSpec(strategy, leg, isFutures);
         if (orderType == null)
             return new TradeResult { Success = false, ErrorMessage = error, FailureCategory = TradeFailureCategory.Rejected };
 
-        var gate = _symbolExecutionLocks.GetOrAdd(strategy.Symbol, _ => new SemaphoreSlim(1, 1));
+        var gate = GetExecutionGate(strategy.Symbol);
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // 确定性 clientOrderId：对账按策略与腿精确匹配
             var clientOrderId = BuildConditionOrderClientOrderId(strategy.Id, leg);
 
-            // 网络异常重试：与普通下单一致的指数退避（1s/2s/4s）
-            var response = await PlaceOrderWithRetryAsync(
-                token => exchangeClient.PlaceOrderAsync(
-                    strategy.Symbol, side, orderType.Value, strategy.Quantity,
+            var response = await exchangeClient.PlaceOrderAsync(
+                    strategy.Symbol, side, orderType.Value, quantity,
                     price: null, clientOrderId,
-                    reduceOnly: true,
-                    stopPrice: stopPrice, trailingDelta: trailingDelta, ct: token),
-                "挂条件单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {StrategyId}",
-                $"挂条件单响应为空（已重试 {OrderRetryCount} 次）",
-                ct,
-                clientOrderId,
-                strategy.Symbol,
-                strategy.Id);
+                    // 现货没有 reduceOnly：卖出单本身就是减仓，传 true 会被交易所拒绝
+                    reduceOnly: isFutures,
+                    stopPrice: stopPrice, trailingDelta: trailingDelta, ct: ct);
 
             // 挂单成功即落 Pending 交易记录：OrderStateSyncService 对既有对账管线
             // 自动感知成交（回写持仓 FIFO 与日统计），无需新增成交流
@@ -253,7 +288,8 @@ public class TradeExecutor(
                 Symbol = strategy.Symbol,
                 Side = side,
                 OrderType = orderType.Value,
-                RequestedQty = strategy.Quantity,
+                ReduceOnly = isFutures,
+                RequestedQty = quantity,
                 ExecutedQty = 0,
                 Status = MapStatus(response.Status),
                 ExchangeOrderId = long.TryParse(response.OrderId, out var orderId) ? orderId : 0,
@@ -263,7 +299,7 @@ public class TradeExecutor(
 
             _logger.LogInformation(
                 "条件单已挂出: {StrategyId} {Type} {Symbol} {Side} 数量:{Qty} 订单ID:{OrderId}",
-                strategy.Id, orderType.Value, strategy.Symbol, strategy.Side, strategy.Quantity, response.OrderId);
+                strategy.Id, orderType.Value, strategy.Symbol, side, quantity, response.OrderId);
 
             return new TradeResult { Success = true, Record = record };
         }
@@ -274,6 +310,110 @@ public class TradeExecutor(
                 ? TradeFailureCategory.Network
                 : TradeFailureCategory.Other;
             return new TradeResult { Success = false, ErrorMessage = ex.Message, FailureCategory = category };
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 现货 AI 策略双腿保护的 OCO 下单：止损腿（STOP_LOSS，触发即市价）与止盈腿
+    /// （TAKE_PROFIT，触发即市价）打包为一个 orderList，共享同一数量。
+    /// 必须用 OCO 而不是两张独立条件单：现货挂单锁定基础资产，两张全量卖单的第二张
+    /// 必然因余额被第一张锁定而拒单，止盈腿将永远挂不出去。OCO 只锁定一次数量，
+    /// 且任一腿成交后交易所自动撤销另一腿，应用关闭期间保护也不会失效。
+    /// 两腿各落一条 Pending 交易记录，对账按各自的 MC 幂等 ID 识别（撤销任一成员单
+    /// 即撤销整个列表，币安现货行为）。
+    /// </summary>
+    public virtual async Task<OcoPlacementResult> PlaceSpotProtectiveOcoAsync(
+        TradingStrategy strategy, decimal quantity, CancellationToken ct = default)
+    {
+        var exchangeClient = ResolveClientSnapshot();
+        if (exchangeClient.IsFutures)
+        {
+            return new OcoPlacementResult
+            {
+                Success = false,
+                Error = "OCO 仅现货支持，合约双腿走 reduceOnly 条件单",
+                FailureCategory = TradeFailureCategory.Rejected
+            };
+        }
+
+        var (stopSide, stopType, stopPrice, _, stopError) =
+            BuildConditionOrderSpec(strategy, ConditionOrderLeg.Stop, isFutures: false);
+        var (takeProfitSide, takeProfitType, takeProfitPrice, _, takeProfitError) =
+            BuildConditionOrderSpec(strategy, ConditionOrderLeg.TakeProfit, isFutures: false);
+
+        if (stopType == null || stopPrice is not > 0)
+            return new OcoPlacementResult { Success = false, Error = stopError ?? "止损腿缺少触发价", FailureCategory = TradeFailureCategory.Rejected };
+        if (takeProfitType == null || takeProfitPrice is not > 0)
+            return new OcoPlacementResult { Success = false, Error = takeProfitError ?? "止盈腿缺少触发价", FailureCategory = TradeFailureCategory.Rejected };
+        if (quantity <= 0)
+            return new OcoPlacementResult { Success = false, Error = "OCO 数量必须大于 0", FailureCategory = TradeFailureCategory.Rejected };
+
+        var stopClientOrderId = BuildConditionOrderClientOrderId(strategy.Id, ConditionOrderLeg.Stop);
+        var takeProfitClientOrderId = BuildConditionOrderClientOrderId(strategy.Id, ConditionOrderLeg.TakeProfit);
+
+        var gate = GetExecutionGate(strategy.Symbol);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            // 双腿方向一致（AI 护栏均为持仓反向离场），以止损腿方向作为 OCO 方向
+            var orders = await exchangeClient.PlaceSpotOcoAsync(
+                    strategy.Symbol, stopSide, quantity,
+                    stopClientOrderId, stopPrice.Value,
+                    takeProfitClientOrderId, takeProfitPrice.Value, ct);
+
+            var stopOrder = orders[0];
+            var takeProfitOrder = orders[1];
+
+            var stopRecord = new TradeRecord
+            {
+                StrategyId = strategy.Id,
+                Symbol = strategy.Symbol,
+                Side = stopSide,
+                OrderType = stopType.Value,
+                RequestedQty = stopOrder.RequestedQty,
+                ExecutedQty = 0,
+                Status = MapStatus(stopOrder.Status),
+                ExchangeOrderId = long.TryParse(stopOrder.OrderId, out var stopOrderId) ? stopOrderId : 0,
+                CreatedAt = DateTime.UtcNow
+            };
+            var takeProfitRecord = new TradeRecord
+            {
+                StrategyId = strategy.Id,
+                Symbol = strategy.Symbol,
+                Side = takeProfitSide,
+                OrderType = takeProfitType.Value,
+                RequestedQty = takeProfitOrder.RequestedQty,
+                ExecutedQty = 0,
+                Status = MapStatus(takeProfitOrder.Status),
+                ExchangeOrderId = long.TryParse(takeProfitOrder.OrderId, out var tpOrderId) ? tpOrderId : 0,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _dataService.SaveTradeRecordAsync(stopRecord, ct).ConfigureAwait(false);
+            await _dataService.SaveTradeRecordAsync(takeProfitRecord, ct).ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "现货 OCO 保护单已挂出: {StrategyId} {Symbol} 数量:{Qty} 止损:{Stop} 止盈:{TakeProfit} 订单ID:{StopOrderId}/{TpOrderId}",
+                strategy.Id, strategy.Symbol, quantity, stopPrice, takeProfitPrice,
+                stopOrder.OrderId, takeProfitOrder.OrderId);
+
+            return new OcoPlacementResult
+            {
+                Success = true,
+                StopRecord = stopRecord,
+                TakeProfitRecord = takeProfitRecord
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "挂 OCO 保护单失败: {StrategyId} {Symbol}", strategy.Id, strategy.Symbol);
+            var category = IsTransient(ex)
+                ? TradeFailureCategory.Network
+                : TradeFailureCategory.Other;
+            return new OcoPlacementResult { Success = false, Error = ex.Message, FailureCategory = category };
         }
         finally
         {
@@ -309,6 +449,8 @@ public class TradeExecutor(
         // 持有 SemaphoreSlim，导致同一标的后续所有交易永久阻塞。
         // 退出型触发（止损/止盈/网格破网/AI 硬边界）透传 requireClose：风控据此放行减仓单，
         // 避免熔断期间止损被拒绝、持仓失去保护
+        if (exchangeClient.IsFutures && !requireClose && await IsClosePositionAsync(exchangeClient, instrumentSymbol, side, ct) == true)
+            requireClose = true;
         var riskCheck = await _riskManager.ValidateOrderAsync(
             instrumentSymbol, side, quantity, currentPrice, type, strategyId, requireClose, ct);
 
@@ -348,7 +490,7 @@ public class TradeExecutor(
             {
                 Success = false,
                 ErrorMessage = $"风控拒绝: {riskCheck.Reason}",
-                FailureCategory = TradeFailureCategory.Rejected
+                FailureCategory = riskCheck.Deferred ? TradeFailureCategory.Deferred : TradeFailureCategory.Rejected
             };
         }
         else if (!requireClose && _alertGate?.IsGated(MarketType.Crypto, instrumentSymbol) == true)
@@ -384,22 +526,21 @@ public class TradeExecutor(
         }
 
         // 仅在实际调用交易所 API 时持有 symbol 锁，防止同一标的并发重复下单
-        var gate = _symbolExecutionLocks.GetOrAdd(
-            instrumentSymbol.Trim(), static _ => new SemaphoreSlim(1, 1));
+        var gate = GetExecutionGate(instrumentSymbol);
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // 快照一致性复检：等待风控/用户确认期间交易模式可能已被切换，
             // 与入口快照不一致时拒绝本笔订单，绝不把它路由到另一个环境
-            if (modeAtEntry.HasValue && _environmentService!.CurrentMode != modeAtEntry.Value)
+            if (modeAtEntry.HasValue && _environmentService?.CurrentMode is { } currentMode && currentMode != modeAtEntry.Value)
             {
                 _logger.LogError(
                     "交易模式在确认期间被切换（{EntryMode} → {CurrentMode}），拒绝下单: {Symbol} {Side}",
-                    modeAtEntry.Value, _environmentService.CurrentMode, instrumentSymbol, side);
+                    modeAtEntry.Value, currentMode, instrumentSymbol, side);
                 return new TradeResult
                 {
                     Success = false,
-                    ErrorMessage = $"交易模式在确认期间被切换（{modeAtEntry.Value} → {_environmentService.CurrentMode}），本笔订单已取消，请重新发起",
+                    ErrorMessage = $"交易模式在确认期间被切换（{modeAtEntry.Value} → {currentMode}），本笔订单已取消，请重新发起",
                     FailureCategory = TradeFailureCategory.Rejected
                 };
             }
@@ -411,8 +552,10 @@ public class TradeExecutor(
             if (side == OrderSide.Sell && !exchangeClient.IsFutures)
             {
                 var openPositions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
+                var owner = await _dataService.GetStrategyAsync(strategyId, ct);
                 var availableQuantity = openPositions
                     .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
+                    .Where(p => owner?.Type is not (StrategyType.GridTrading or StrategyType.AISignal) || p.StrategyId == strategyId)
                     .Sum(p => p.RemainingQuantity);
 
                 if (quantity > availableQuantity)
@@ -430,8 +573,7 @@ public class TradeExecutor(
             }
 
             return await ExecuteApprovedOrderAsync(
-                exchangeClient, modeAtEntry,
-                instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
+                exchangeClient, instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
                 strategyId, aiReasoning, requireClose, ct).ConfigureAwait(false);
         }
         finally
@@ -440,10 +582,6 @@ public class TradeExecutor(
         }
     }
 
-    /// <summary>
-    /// 解析当前活跃客户端快照：RoutingExchangeClient 按当前模式路由，
-    /// 其他实现（单元测试 Mock）原样返回。
-    /// </summary>
     /// <summary>
     /// 紧急平仓（kill switch 的"全部平仓"路径）：绕过风控校验与人工确认——
     /// 紧急场景下等确认等于把用户暴露在风险中——但保留客户端快照一致性、symbol 锁、
@@ -461,8 +599,7 @@ public class TradeExecutor(
         var exchangeClient = ResolveClientSnapshot();
         var modeAtEntry = expectedMode ?? _environmentService?.CurrentMode;
 
-        var gate = _symbolExecutionLocks.GetOrAdd(
-            instrumentSymbol.Trim(), static _ => new SemaphoreSlim(1, 1));
+        var gate = GetExecutionGate(instrumentSymbol);
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -480,8 +617,7 @@ public class TradeExecutor(
             }
 
             return await ExecuteApprovedOrderAsync(
-                exchangeClient, modeAtEntry,
-                instrumentSymbol, side, OrderType.Market, quantity, currentPrice, null,
+                exchangeClient, instrumentSymbol, side, OrderType.Market, quantity, currentPrice, null,
                 EmergencyStopService.EmergencyCloseStrategyId,
                 "紧急停止：全部平仓",
                 requireClose: true,
@@ -493,6 +629,10 @@ public class TradeExecutor(
         }
     }
 
+    /// <summary>
+    /// 解析当前活跃客户端快照：RoutingExchangeClient 按当前模式路由，
+    /// 其他实现（单元测试 Mock）原样返回。
+    /// </summary>
     private static IExchangeClient ResolveClientSnapshot(IExchangeClient client)
         => client is RoutingExchangeClient router ? router.GetActiveClientSnapshot() : client;
 
@@ -531,21 +671,18 @@ public class TradeExecutor(
         }
     }
 
-    private IExchangeClient ResolveClientSnapshot() => ResolveClientSnapshot(_exchangeClient);
+    internal IExchangeClient ResolveClientSnapshot() => ResolveClientSnapshot(_exchangeClient);
 
     private async Task<TradeResult> ExecuteApprovedOrderAsync(
-        IExchangeClient exchangeClient, TradingMode? modeAtEntry,
-        string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
+        IExchangeClient exchangeClient, string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice,
         string strategyId, string? aiReasoning, bool requireClose,
         CancellationToken ct)
     {
         try
         {
-            // 生成订单客户端 ID（"MA" + 16 位 hex，总长 18 ≤ 币安 36 字符上限）。
-            // 同一次下单内的网络异常重试复用该 ID：币安收到重复的 newClientOrderId 时返回已有订单而非新建，避免重复下单。
-            // 注意：幂等性仅覆盖本方法的内部重试循环；跨调用重试（如人工重发）会生成新 ID。
-            var clientOrderId = "MA" + Convert.ToHexString(Guid.NewGuid().ToByteArray())[..16].ToLowerInvariant();
+            // 幂等下单 ID："MA" + 16 位 hex（≤ 币安 36 字符上限），每次调用生成新 ID。
+            var clientOrderId = BuildClientOrderId();
 
             // 合约模式：判断本次操作是开仓还是平仓
             // 平仓 = 持有多头时卖出 / 持有空头时买入，需要 reduceOnly=true
@@ -589,77 +726,87 @@ public class TradeExecutor(
                 // 避免使用交易所默认的 20x 导致强平风险过高，同时允许用户按风险承受能力调整
                 if (!reduceOnly)
                 {
+                    // 杠杆必须先设置成功再下单：失败时沿用交易所当前杠杆（可能是 20x 默认值），
+                    // 用户以为自己在 10x 而实际承担 2 倍风险，属于不可接受的静默偏差。
+                    // 开仓因此 fail-closed；平仓（reduceOnly）不受影响，减仓不应被杠杆问题阻塞。
+                    var riskConfig = await _dataService.LoadRiskConfigAsync(ct).ConfigureAwait(false);
+                    var leverage = Math.Clamp(riskConfig.FuturesLeverage, MinFuturesLeverage, MaxFuturesLeverage);
                     try
                     {
-                        var leverage = DefaultFuturesLeverage;
-                        try
-                        {
-                            var riskConfig = await _dataService.LoadRiskConfigAsync(ct).ConfigureAwait(false);
-                            leverage = riskConfig.FuturesLeverage;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "读取杠杆配置失败，使用默认 {Leverage}x", DefaultFuturesLeverage);
-                        }
-
-                        // 配置可能来自手工编辑的数据库，越界值钳制到交易所合法区间
-                        leverage = Math.Clamp(leverage, MinFuturesLeverage, MaxFuturesLeverage);
-                        await exchangeClient.SetLeverageAsync(instrumentSymbol, leverage, ct);
+                        await exchangeClient.SetLeverageAsync(instrumentSymbol, leverage, ct).ConfigureAwait(false);
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        // 杠杆设置失败不应阻止下单，使用交易所当前杠杆继续
-                        _logger.LogWarning(ex, "设置合约杠杆失败，使用交易所当前杠杆: {Symbol}", instrumentSymbol);
+                        _logger.LogError(ex,
+                            "设置合约杠杆失败，拒绝开仓（避免以交易所默认杠杆承担未预期风险）: {Symbol} 目标 {Leverage}x",
+                            instrumentSymbol, leverage);
+                        return new TradeResult
+                        {
+                            Success = false,
+                            ErrorMessage = $"无法设置 {instrumentSymbol} 杠杆为 {leverage}x，本笔开仓已取消，请稍后重试",
+                            FailureCategory = TradeFailureCategory.Network
+                        };
                     }
                 }
             }
 
-            // 网络异常重试：最多 3 次，指数退避 1s/2s/4s。
-            // 业务错误（如余额不足、风控拒绝）不重试，直接抛出。
-            var response = await PlaceOrderWithRetryAsync(
-                token => exchangeClient.PlaceOrderAsync(
-                    instrumentSymbol, side, type, quantity,
-                    type == OrderType.Limit ? limitPrice : null,
-                    clientOrderId, reduceOnly,
-                    stopPrice: null, trailingDelta: null, ct: token),
-                "下单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {Side}",
-                $"交易所下单响应为空（已重试 {OrderRetryCount} 次）",
-                ct,
-                clientOrderId,
-                instrumentSymbol,
-                side);
+            var pending = await _dataService.GetUnsettledTradeRecordsAsync(instrumentSymbol, ct);
+            if (pending.Any(r => r.ExchangeOrderId == 0))
+                return new TradeResult { FailureCategory = TradeFailureCategory.OrderStateUnknown, ErrorMessage = $"{instrumentSymbol} 有待核对的下单请求" };
 
-            var record = new TradeRecord
+            var intent = new TradeRecord
             {
+                Id = clientOrderId,
                 StrategyId = strategyId,
                 Symbol = instrumentSymbol,
                 Side = side,
                 OrderType = type,
-                RequestedQty = response.RequestedQty == 0 ? quantity : response.RequestedQty,
-                ExecutedQty = response.ExecutedQty,
-                RequestedPrice = limitPrice,
-                // 市价单 response.Price 通常为 0，优先用成交均价（合约 avgPrice），其次用 cummulativeQuoteQty/executedQty 计算
-                ExecutedPrice = CalculateExecutedPrice(response, currentPrice),
-                Commission = response.FillCommission,
-                CommissionAsset = response.CommissionAsset ?? string.Empty,
-                Status = MapStatus(response.Status),
-                ExchangeOrderId = long.TryParse(response.OrderId, out var orderId) ? orderId : 0,
-                AIReasoning = aiReasoning,
-                CompletedAt = response.Status == "FILLED" ? DateTime.UtcNow : null
+                RequestedQty = quantity,
+                RequestedPrice = limitPrice ?? currentPrice,
+                ReduceOnly = reduceOnly,
+                Status = TradeRecordStatus.Pending,
+                AIReasoning = aiReasoning
             };
-
-            // 成交滑点检测：市价单无法事前限制滑点，只能事后发现并提示。
-            // 限价单的滑点由用户设定的 SlippageTolerance 事前约束，不重复判定。
-            // 必须在落库前赋值：仓库层只在 INSERT 写该列，后续 UPDATE 不覆盖，
-            // 落在保存之后会导致 slippage_percent 恒为空
-            decimal? slippagePercent = null;
-            if (type == OrderType.Market && currentPrice > 0 && record.ExecutedPrice > 0)
+            await _dataService.SaveTradeRecordAsync(intent, ct);
+            ExchangeOrderResult response;
+            try
             {
-                slippagePercent = Math.Abs(record.ExecutedPrice - currentPrice) / currentPrice * 100m;
-                record.SlippagePercent = slippagePercent;
+                response = await exchangeClient.PlaceOrderAsync(
+                        instrumentSymbol, side, type, quantity,
+                        type is OrderType.Limit or OrderType.PostOnlyLimit ? limitPrice : null,
+                        clientOrderId, reduceOnly,
+                        stopPrice: null, trailingDelta: null, ct: ct).ConfigureAwait(false);
+            }
+            catch (FriendlyException ex) when (ex.InnerException == null)
+            {
+                await _dataService.ReconcileTradeRecordAsync(intent, new ExchangeOrderResult { Status = "REJECTED" }, ct);
+                throw;
+            }
+            catch (Exception)
+            {
+                try
+                {
+                    response = await exchangeClient.GetOrderByClientOrderIdAsync(instrumentSymbol, clientOrderId, ct)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception recoveryException)
+                {
+                    _logger.LogError(recoveryException,
+                        "订单收敛查询失败，冻结自动重试并等待人工对账: {Symbol} {ClientOrderId}",
+                        instrumentSymbol, clientOrderId);
+                    return new TradeResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"无法确认订单是否已落地（幂等ID={clientOrderId}）。已停止自动重试，请在交易所核对订单后人工处理",
+                        FailureCategory = TradeFailureCategory.OrderStateUnknown
+                    };
+                }
             }
 
-            await _dataService.SaveTradeRecordAsync(record, ct);
+            if (response.ExecutedQty > 0 && response.CommissionAsset == null && exchangeClient is BinanceExchangeClient)
+                response = await exchangeClient.GetOrderByClientOrderIdAsync(instrumentSymbol, clientOrderId, ct);
+            var record = await _dataService.ReconcileTradeRecordAsync(intent, response, ct);
+            var slippagePercent = record.SlippagePercent;
 
             // 告警在落库之后：告警链路失败不得影响已完成的成交记录
             if (slippagePercent.HasValue)
@@ -669,44 +816,19 @@ public class TradeExecutor(
                     .ConfigureAwait(false);
             }
 
-            // 持仓追踪与 PnL 计算：现货用本地 FIFO，合约基于交易所持仓
-            decimal pnl = 0;
-            if (record.ExecutedQty > 0)
-            {
-                if (isFutures)
-                {
-                    pnl = await UpdateFuturesPositionAsync(
-                        instrumentSymbol, side, record.ExecutedQty, record.ExecutedPrice,
-                        strategyId, record.CreatedAt, reduceOnly, ct);
-                }
-                else
-                {
-                    pnl = await UpdateSpotPositionFifoAsync(
-                        instrumentSymbol, side, record.ExecutedQty, record.ExecutedPrice,
-                        strategyId, record.CreatedAt, ct);
-                }
-            }
-            // 仅在实际有成交（首次填单）时计入交易次数；未成交订单不计，
-            // 后续部分成交增量由对账路径补充统计，避免同一订单重复计数
-            await _dataService.UpdateDailyStatsAsync(pnl, record.Commission,
-                countTrade: record.ExecutedQty > 0, ct);
-
-            // 已实现盈亏回写到记录：绩效统计（胜率/盈亏比/最大回撤）以该列为数据基础。
-            // 落库在持仓结算之后，结算失败时记录保持 RealizedPnl=0（未知），不得猜测
-            if (pnl != 0)
-                await _dataService.UpdateTradeRecordRealizedPnlAsync(record.Id, pnl, ct);
-
             _logger.LogInformation("交易执行成功: {StrategyId} 订单ID:{OrderId} 状态:{Status} PnL:{Pnl}",
-                strategyId, response.OrderId, response.Status, pnl);
+                strategyId, response.OrderId, response.Status, record.RealizedPnl);
 
-            return new TradeResult { Success = true, Record = record };
+            return record.Status is TradeRecordStatus.Failed or TradeRecordStatus.Cancelled && record.ExecutedQty == 0
+                ? new TradeResult { Record = record, FailureCategory = TradeFailureCategory.Rejected, ErrorMessage = $"交易所未执行订单：{response.Status}" }
+                : new TradeResult { Success = true, Record = record };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "交易执行失败: {InstrumentSymbol} {Side}", instrumentSymbol, side);
             // 网络类异常（含重试耗尽）短期可恢复；其余归为其他失败由调用方按冷却策略处理。
             // 交易所异常统一被包装成 FriendlyException，必须沿 InnerException 链递归判定。
-            var category = IsTransient(ex)
+            var category = ex is PostOnlyWouldTakeException ? TradeFailureCategory.PostOnlyWouldTake : IsTransient(ex)
                 ? TradeFailureCategory.Network
                 : TradeFailureCategory.Other;
             return new TradeResult { Success = false, ErrorMessage = ex.Message, FailureCategory = category };
@@ -733,90 +855,14 @@ public class TradeExecutor(
         return false;
     }
 
-    /// <summary>
-    /// 下单重试次数：指数退避 1s/2s/4s，合计 3 次尝试。
-    /// </summary>
-    private const int OrderRetryCount = 3;
-
-    /// <summary>
-    /// 带指数退避的下单重试，收敛条件单与普通下单两条路径的同一段重试逻辑。
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// 仅瞬态网络异常参与重试；业务错误（余额不足、风控拒绝）不重试直接抛出。
-    /// 重复提交安全由调用方传入的 clientOrderId 保证：交易所按幂等ID 去重，
-    /// 重试不会产生第二笔挂单。
-    /// </para>
-    /// <para>
-    /// 重试耗尽仍未拿到响应时抛出 <see cref="InvalidOperationException"/>
-    /// （携带最后一次网络异常），由调用方的 catch 归类为 Network 失败——
-    /// 该类失败短期可恢复，调用方按冷却策略处理而非直接停用策略。
-    /// </para>
-    /// </remarks>
-    /// <param name="place">下单委托。</param>
-    /// <param name="retryLogMessage">重试警告日志模板，须依次含 {Attempt}/{Max}/{Delay}/{ClientOrderId} 占位符。</param>
-    /// <param name="emptyResponseMessage">重试耗尽且响应为空时的异常文案。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <param name="clientOrderId">幂等下单 ID，随重试日志透出。</param>
-    /// <param name="logContext">日志模板中 {ClientOrderId} 之后的上下文参数。</param>
-    private async Task<ExchangeOrderResult> PlaceOrderWithRetryAsync(
-        Func<CancellationToken, Task<ExchangeOrderResult>> place,
-        string retryLogMessage,
-        string emptyResponseMessage,
-        CancellationToken ct,
-        string clientOrderId,
-        params object?[] logContext)
-    {
-        ExchangeOrderResult? response = null;
-        Exception? lastNetworkException = null;
-
-        for (var attempt = 1; attempt <= OrderRetryCount; attempt++)
-        {
-            try
-            {
-                response = await place(ct).ConfigureAwait(false);
-                break;
-            }
-            catch (Exception ex) when (IsTransient(ex) && !ct.IsCancellationRequested)
-            {
-                lastNetworkException = ex;
-                if (attempt >= OrderRetryCount)
-                    break;
-
-                var delayMs = (int)Math.Pow(2, attempt - 1) * 1000;
-
-                // 前缀四参（尝试序号/总次数/退避时长/幂等ID）拼接调用方上下文，与模板占位符对齐
-                var logArgs = new object?[4 + logContext.Length];
-                logArgs[0] = attempt;
-                logArgs[1] = OrderRetryCount;
-                logArgs[2] = delayMs;
-                logArgs[3] = clientOrderId;
-                logContext.CopyTo(logArgs, 4);
-                _logger.LogWarning(ex, retryLogMessage, logArgs);
-
-                await Task.Delay(delayMs, ct).ConfigureAwait(false);
-            }
-        }
-
-        if (response == null)
-            throw new InvalidOperationException(emptyResponseMessage, lastNetworkException);
-
-        return response;
-    }
-
-    /// <summary>
-    /// 合约默认杠杆倍数。开仓前自动设置，避免使用交易所默认的 20x 导致强平风险过高。
-    /// </summary>
-    private const int DefaultFuturesLeverage = 10;
-
     /// <summary>合约杠杆合法区间（币安 1-125 倍），配置越界时钳制。</summary>
     private const int MinFuturesLeverage = 1;
     private const int MaxFuturesLeverage = 125;
 
     /// <summary>
     /// 判断合约交易方向是否为平仓操作。
-    /// 持有多头（PositionAmt > 0）时卖出 = 平多
-    /// 持有空头（PositionAmt < 0）时买入 = 平空
+    /// 持有多头（PositionAmt &gt; 0）时卖出 = 平多
+    /// 持有空头（PositionAmt &lt; 0）时买入 = 平空
     /// 返回 null 表示持仓查询失败、开/平仓无法判定（调用方必须中止下单）。
     /// </summary>
     private async Task<bool?> IsClosePositionAsync(IExchangeClient exchangeClient, string symbol, OrderSide side, CancellationToken ct)
@@ -842,79 +888,6 @@ public class TradeExecutor(
             _logger.LogWarning(ex, "查询合约持仓失败，无法判断是否为平仓: {Symbol}", symbol);
             return null;
         }
-    }
-
-    /// <summary>
-    /// 现货 FIFO 持仓追踪：买入开多仓，卖出按 FIFO 平仓计算已实现盈亏。
-    /// </summary>
-    private async Task<decimal> UpdateSpotPositionFifoAsync(
-        string symbol, OrderSide side, decimal executedQty, decimal executedPrice,
-        string strategyId, DateTime openedAt, CancellationToken ct)
-    {
-        if (side == OrderSide.Buy)
-        {
-            await _dataService.OpenPositionAsync(new Position
-            {
-                Symbol = symbol,
-                Side = PositionSide.Long,
-                Quantity = executedQty,
-                EntryPrice = executedPrice,
-                StrategyId = strategyId,
-                OpenedAt = openedAt
-            }, ct);
-            return 0;
-        }
-
-        return await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct);
-    }
-
-    /// <summary>
-    /// 合约持仓追踪与 PnL 计算。
-    /// 开仓时记录本地持仓；平仓时按 FIFO 逐笔匹配开仓记录计算已实现盈亏。
-    /// 相比查询交易所剩余持仓均价（分批开仓时部分平仓会失真），
-    /// 本地 FIFO 能精确匹配每笔开仓价格；手续费单独计入日统计，不在 PnL 中重复扣减。
-    /// </summary>
-    private async Task<decimal> UpdateFuturesPositionAsync(
-        string symbol, OrderSide side, decimal executedQty, decimal executedPrice,
-        string strategyId, DateTime openedAt,
-        bool isClose, CancellationToken ct)
-    {
-        if (!isClose)
-        {
-            // 开仓：记录持仓方向（多头买入/空头卖出）
-            var positionSide = side == OrderSide.Buy ? PositionSide.Long : PositionSide.Short;
-            await _dataService.OpenPositionAsync(new Position
-            {
-                Symbol = symbol,
-                Side = positionSide,
-                Quantity = executedQty,
-                EntryPrice = executedPrice,
-                StrategyId = strategyId,
-                OpenedAt = openedAt
-            }, ct);
-            return 0;
-        }
-
-        // 平仓：卖出平多匹配多头持仓，买入平空匹配空头持仓
-        var closeSide = side == OrderSide.Sell ? PositionSide.Long : PositionSide.Short;
-        return await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct, closeSide);
-    }
-
-    /// <summary>
-    /// 计算实际成交价：优先用合约 avgPrice，其次用 CumulativeQuoteQty/executedQty，最后用当前价兜底。
-    /// </summary>
-    private static decimal CalculateExecutedPrice(ExchangeOrderResult response, decimal currentPrice)
-    {
-        // 合约订单响应可能包含 avgPrice 字段
-        if (response.AveragePrice > 0)
-            return response.AveragePrice;
-
-        // 从成交金额和成交量计算实际成交均价
-        if (response.CumulativeQuoteQty > 0 && response.ExecutedQty > 0)
-            return response.CumulativeQuoteQty / response.ExecutedQty;
-
-        // 市价单 response.Price 通常为 0，用当前价兜底
-        return response.Price == 0 ? currentPrice : response.Price;
     }
 
     private static TradeRecordStatus MapStatus(string status) => status switch

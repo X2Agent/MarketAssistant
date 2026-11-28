@@ -39,8 +39,6 @@ public sealed class AlertSuppressionPolicy
     public Decision Evaluate(
         AlertEvent alert, MergeState mergeState, DateTime utcNow, bool suppressNotification = false)
     {
-        ArgumentNullException.ThrowIfNull(alert);
-
         var isMerge = mergeState.LastRaisedAtUtc.HasValue &&
                       utcNow - mergeState.LastRaisedAtUtc.Value < MergeWindow;
 
@@ -56,8 +54,6 @@ public sealed class AlertSuppressionPolicy
     /// </summary>
     public static bool IsSilencedByTradingSession(AlertEvent alert, bool isTradingSession)
     {
-        ArgumentNullException.ThrowIfNull(alert);
-
         return !isTradingSession
                && alert.MarketType == MarketType.AShare
                && alert.Source == AlertSource.PriceAlert

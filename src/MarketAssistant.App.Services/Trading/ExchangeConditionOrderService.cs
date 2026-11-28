@@ -33,7 +33,7 @@ public enum ConditionOrderLeg
 /// 并经 <see cref="OrderStateSyncService.TradeRecordFilled"/> 事件驱动策略完结。
 /// 条件单常驻交易所：监控停止/应用退出不撤单，重启后对账自动接管（这正是兜底价值所在）。
 /// </summary>
-public sealed class ExchangeConditionOrderService
+public sealed partial class ExchangeConditionOrderService
 {
     /// <summary>周期对账间隔。覆盖追踪止损激活（峰值首次落库绕过策略变更广播）等旁路状态变化。</summary>
     public static readonly TimeSpan ReconcileInterval = TimeSpan.FromSeconds(60);
@@ -84,11 +84,13 @@ public sealed class ExchangeConditionOrderService
         StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
         StrategyType.AISignal => strategy.ExecutionCount > 0
                                  && (strategy.StopLossPrice > 0 || strategy.TakeProfitPrice > 0)
-                                 && AISignalParams.FromJson(strategy.CustomParams)?.ShadowMode != true,
+                                 && (HasCorruptedAiParameters(strategy)
+                                     || AISignalParams.TryFromJson(strategy.CustomParams, out var parameters)
+                                        && parameters is { ShadowMode: false }),
         _ => false
     };
 
-    /// <summary>策略需要维护的条件单腿别集合。</summary>
+    /// <summary>策略需要维护的条件单腿别集合；AI 参数损坏时返回空集合，只保留既有订单、不补挂新腿。</summary>
     public static IReadOnlyList<ConditionOrderLeg> ResolveLegs(TradingStrategy strategy)
     {
         var legs = new List<ConditionOrderLeg>();
@@ -103,8 +105,13 @@ public sealed class ExchangeConditionOrderService
                     legs.Add(ConditionOrderLeg.TakeProfit);
                 break;
             case StrategyType.AISignal:
-                if (AISignalParams.FromJson(strategy.CustomParams)?.ShadowMode == true)
+                if (HasCorruptedAiParameters(strategy)
+                    || AISignalParams.TryFromJson(strategy.CustomParams, out var parameters) is false
+                    || parameters is not { ShadowMode: false })
+                {
                     break;
+                }
+
                 if (strategy.ExecutionCount > 0 && strategy.StopLossPrice > 0)
                     legs.Add(ConditionOrderLeg.Stop);
                 if (strategy.ExecutionCount > 0 && strategy.TakeProfitPrice > 0)
@@ -115,11 +122,16 @@ public sealed class ExchangeConditionOrderService
         return legs;
     }
 
+    /// <summary>AI 参数是否为损坏 JSON。损坏策略参数未知，必须保留既有交易所保护单并停止补挂。</summary>
+    private static bool HasCorruptedAiParameters(TradingStrategy strategy) =>
+        strategy.Type == StrategyType.AISignal
+        && !AISignalParams.TryFromJson(strategy.CustomParams, out _);
+
     /// <summary>
     /// 条件单参数指纹（类型|腿别|方向|数量|触发价|回调基点）：策略编辑或 AI 护栏更新后与在途挂单比对，
     /// 不一致则撤旧挂新。AI 信号策略按腿取 StopLossPrice / TakeProfitPrice。
     /// </summary>
-    internal static string BuildFingerprint(TradingStrategy strategy, ConditionOrderLeg leg)
+    internal static string BuildFingerprint(TradingStrategy strategy, ConditionOrderLeg leg, decimal? quantity = null)
     {
         var triggerPrice = strategy.Type == StrategyType.AISignal
             ? (leg == ConditionOrderLeg.Stop ? strategy.StopLossPrice : strategy.TakeProfitPrice) ?? 0m
@@ -127,7 +139,7 @@ public sealed class ExchangeConditionOrderService
         var trailingDelta = strategy.Type == StrategyType.TrailingStop && leg == ConditionOrderLeg.Stop
             ? TradeExecutor.ResolveTrailingDeltaBasisPoints(strategy).ToString()
             : string.Empty;
-        return $"{strategy.Type}|{leg}|{strategy.Side}|{strategy.Quantity}|{triggerPrice}|{trailingDelta}";
+        return FormattableString.Invariant($"{strategy.Type}|{leg}|{strategy.Side}|{quantity ?? strategy.Quantity:G29}|{triggerPrice:G29}|{trailingDelta}");
     }
 
     /// <summary>判断策略已持久化的指纹串（支持双腿以 ';' 分隔）是否包含指定腿的期望指纹。</summary>
@@ -257,18 +269,46 @@ public sealed class ExchangeConditionOrderService
     private async Task ReconcileCoreAsync(CancellationToken ct)
     {
         var exchangeClient = _exchangeClient.GetActiveClientSnapshot();
-        if (!exchangeClient.IsFutures)
-        {
-            // 现货无条件单语义：清空映射，退出型策略由客户端评估兜底
-            _liveOrderIds.Clear();
-            return;
-        }
 
+        // 合约与现货都走交易所侧保护：合约用 STOP_MARKET / TAKE_PROFIT_MARKET（reduceOnly 双腿），
+        // 现货用 STOP_LOSS / TAKE_PROFIT（触发即市价），AI 策略双腿打包为 OCO。
+        // 早期实现直接在现货返回、清空映射，导致现货持仓在应用关闭期间完全没有交易所侧保护。
         var activeStrategies = await _strategyService
             .GetStrategiesByStatusAsync(StrategyStatus.Active, ct).ConfigureAwait(false);
-        var protectiveStrategies = activeStrategies
-            .Where(IsProtectiveExitStrategy)
-            .ToList();
+
+        // AI 策略的护栏腿只在确有该策略自己的持仓时才挂：持仓消失后（退出成交、手动平仓、
+        // 挂单未成交的"幻影护栏"）不再补挂——现货补挂会生成无持仓保护的裸卖单，
+        // 应用关闭期间腿成交后剩下的兄弟腿也会在下个周期作为孤儿被撤销。
+        var protectiveStrategies = new List<TradingStrategy>();
+        var ownPositionByStrategy = new Dictionary<string, (decimal Remaining, bool IsLong)>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var strategy in activeStrategies.Where(IsProtectiveExitStrategy))
+        {
+            if (strategy.Type != StrategyType.AISignal)
+            {
+                protectiveStrategies.Add(strategy);
+                continue;
+            }
+
+            if (HasCorruptedAiParameters(strategy))
+            {
+                // 参数未知时不做持仓门控：无论本地账本是否可见，都不能把既有交易所保护单当孤儿撤掉。
+                // ResolveLegs 对损坏参数返回空集合，本轮也不会补挂新腿。
+                protectiveStrategies.Add(strategy);
+                _logger.LogWarning(
+                    "AI 策略参数损坏，保留既有条件单且本轮不补挂: {StrategyId} {Symbol}",
+                    strategy.Id, strategy.Symbol);
+                continue;
+            }
+
+            var own = await GetOwnOpenPositionAsync(strategy, ct).ConfigureAwait(false);
+            if (own.Remaining <= 0)
+                continue;
+
+            protectiveStrategies.Add(strategy);
+            ownPositionByStrategy[strategy.Id] = own;
+        }
+
         var protectiveIds = protectiveStrategies
             .Select(s => s.Id)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -304,11 +344,57 @@ public sealed class ExchangeConditionOrderService
         foreach (var strategy in protectiveStrategies)
         {
             ct.ThrowIfCancellationRequested();
-            foreach (var leg in ResolveLegs(strategy))
+            var legs = ResolveLegs(strategy);
+
+            // AI 策略的腿方向必须与实际持仓一致：AI 决策驱动开仓方向后，strategy.Side
+            // 不再代表持仓方向（合约可反向开空），规格推导用的 Side 要按账本方向临时校正，
+            // 否则空仓的护栏腿会以卖出方向挂出、被交易所持续拒单
+            if (strategy.Type == StrategyType.AISignal
+                && ownPositionByStrategy.TryGetValue(strategy.Id, out var own))
             {
-                await EnsureConditionOrderAsync(exchangeClient, strategy, leg, managedOrders, ct)
-                    .ConfigureAwait(false);
+                var originalSide = strategy.Side;
+                try
+                {
+                    strategy.Side = own.IsLong ? OrderSide.Buy : OrderSide.Sell;
+                    await PlaceProtectiveLegsAsync(exchangeClient, strategy, own.Remaining, legs, managedOrders, ct)
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    strategy.Side = originalSide;
+                }
+                continue;
             }
+
+            await PlaceProtectiveLegsAsync(exchangeClient, strategy, null, legs, managedOrders, ct)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// 按腿挂保护单：现货 AI 双腿打包为一个 OCO（现货挂单锁定基础资产，两张独立全量卖单
+    /// 的第二张必然因余额被锁定而拒单）；其余场景逐腿挂单。
+    /// </summary>
+    private async Task PlaceProtectiveLegsAsync(
+        IExchangeClient exchangeClient,
+        TradingStrategy strategy,
+        decimal? quantityOverride,
+        IReadOnlyList<ConditionOrderLeg> legs,
+        List<ExchangeOrderResult> managedOrders,
+        CancellationToken ct)
+    {
+        // AI 策略挂单数量按实际持仓余量封顶：护栏数量可能与持仓漂移
+        // （部分成交未同步、加仓只记增量），超量卖出在现货会卖出用户其他来源的资产
+        if (!exchangeClient.IsFutures && strategy.Type == StrategyType.AISignal && legs.Count == 2)
+        {
+            await EnsureSpotOcoAsync(exchangeClient, strategy, quantityOverride!.Value, managedOrders, ct).ConfigureAwait(false);
+            return;
+        }
+
+        foreach (var leg in legs)
+        {
+            await EnsureConditionOrderAsync(exchangeClient, strategy, leg, quantityOverride, managedOrders, ct)
+                .ConfigureAwait(false);
         }
     }
 
@@ -335,13 +421,14 @@ public sealed class ExchangeConditionOrderService
         IExchangeClient exchangeClient,
         TradingStrategy strategy,
         ConditionOrderLeg leg,
+        decimal? quantityOverride,
         List<ExchangeOrderResult> managedOrders,
         CancellationToken ct)
     {
         var clientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id, leg);
         var existing = managedOrders.FirstOrDefault(o =>
             string.Equals(o.ClientOrderId, clientOrderId, StringComparison.Ordinal));
-        var expectedFingerprint = BuildFingerprint(strategy, leg);
+        var expectedFingerprint = BuildFingerprint(strategy, leg, quantityOverride);
         var legKey = (strategy.Id, leg);
 
         if (existing != null)
@@ -374,7 +461,7 @@ public sealed class ExchangeConditionOrderService
             return;
         }
 
-        var result = await _tradeExecutor.PlaceConditionOrderAsync(strategy, leg, ct).ConfigureAwait(false);
+        var result = await _tradeExecutor.PlaceConditionOrderAsync(strategy, leg, quantityOverride, ct).ConfigureAwait(false);
         if (result.Success && result.Record != null)
         {
             _liveOrderIds[legKey] = result.Record.ExchangeOrderId.ToString();

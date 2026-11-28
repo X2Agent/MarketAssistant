@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -54,12 +53,12 @@ internal sealed class TradingSchemaInitializer(ILogger logger, string? dbPath = 
                 commission_asset TEXT,
                 status INTEGER NOT NULL,
                 binance_order_id INTEGER,
+                reduce_only INTEGER NOT NULL DEFAULT 0,
                 ai_reasoning TEXT,
                 created_at TEXT NOT NULL,
                 completed_at TEXT,
                 slippage_percent TEXT,
-                realized_pnl TEXT,
-                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+                realized_pnl TEXT
             )
             """,
 
@@ -318,6 +317,8 @@ internal sealed class TradingSchemaInitializer(ILogger logger, string? dbPath = 
         await EnsureColumnAsync(conn, transaction, "trade_records", "slippage_percent", "TEXT").ConfigureAwait(false);
         // 已实现盈亏（绩效统计用；对账补成交时增量回写）
         await EnsureColumnAsync(conn, transaction, "trade_records", "realized_pnl", "TEXT").ConfigureAwait(false);
+        // 仅减仓标记（订单意图落库时记录；对账补成交时据此区分开仓与平仓）
+        await EnsureColumnAsync(conn, transaction, "trade_records", "reduce_only", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
         // 连续亏损计数（连续亏损熔断用）
         await EnsureColumnAsync(conn, transaction, "daily_stats", "consecutive_losses", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
         await MigrateDailyStatsAsync(conn, transaction).ConfigureAwait(false);

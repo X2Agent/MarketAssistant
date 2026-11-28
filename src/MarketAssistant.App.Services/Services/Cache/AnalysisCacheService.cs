@@ -31,11 +31,6 @@ public class AnalysisCacheService(
     /// </summary>
     public Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string assetSymbol)
     {
-        if (string.IsNullOrWhiteSpace(assetSymbol))
-        {
-            throw new ArgumentNullException(nameof(assetSymbol));
-        }
-
         var cacheKey = GenerateCacheKey(assetSymbol);
         var configFingerprint = GetConfigFingerprint();
 
@@ -63,13 +58,6 @@ public class AnalysisCacheService(
     /// </summary>
     public Task CacheAnalysisAsync(string assetSymbol, MarketAnalysisReport report)
     {
-        if (string.IsNullOrWhiteSpace(assetSymbol))
-        {
-            throw new ArgumentNullException(nameof(assetSymbol));
-        }
-
-        ArgumentNullException.ThrowIfNull(report);
-
         var cacheKey = GenerateCacheKey(assetSymbol);
         var entry = new CachedEntry(report, GetConfigFingerprint());
 
@@ -94,11 +82,6 @@ public class AnalysisCacheService(
     /// </summary>
     public Task ClearCacheAsync(string assetSymbol)
     {
-        if (string.IsNullOrWhiteSpace(assetSymbol))
-        {
-            throw new ArgumentNullException(nameof(assetSymbol));
-        }
-
         var cacheKey = GenerateCacheKey(assetSymbol);
         _memoryCache.Remove(cacheKey);
         _logger.LogInformation("已清除缓存: {AssetSymbol}", assetSymbol);

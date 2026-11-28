@@ -54,7 +54,8 @@ public class TradingDataService
     public Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
         => _strategies.SaveStrategyAsync(strategy, ct);
 
-    public Task<TradingStrategy?> GetStrategyAsync(string id, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换（策略级仓位上限与实盘准入闸门）。</remarks>
+    public virtual Task<TradingStrategy?> GetStrategyAsync(string id, CancellationToken ct = default)
         => _strategies.GetStrategyAsync(id, ct);
 
     public Task<List<TradingStrategy>> GetStrategiesByStatusAsync(StrategyStatus status, CancellationToken ct = default)
@@ -110,11 +111,11 @@ public class TradingDataService
     /// <remarks>virtual 供单元测试替换（绩效统计）。</remarks>
     public virtual Task<List<TradeRecord>> GetRecordsByStrategyAsync(string strategyId, CancellationToken ct = default)
         => _records.GetRecordsByStrategyAsync(strategyId, ct);
-    public Task<List<TradeRecord>> GetUnsettledTradeRecordsAsync(
+    public virtual Task<List<TradeRecord>> GetUnsettledTradeRecordsAsync(
         string? symbol = null, CancellationToken ct = default)
         => _records.GetUnsettledTradeRecordsAsync(symbol, ct);
 
-    public Task<TradeRecord> ReconcileTradeRecordAsync(
+    public virtual Task<TradeRecord> ReconcileTradeRecordAsync(
         TradeRecord existingRecord, ExchangeOrderResult latestOrder, CancellationToken ct = default)
         => _records.ReconcileTradeRecordAsync(existingRecord, latestOrder, ct);
 
@@ -132,7 +133,8 @@ public class TradingDataService
 
     // ─────────────────────────── 持仓 ───────────────────────────
 
-    public Task OpenPositionAsync(Position position, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换（TradeExecutor 开仓 FIFO 落库）。</remarks>
+    public virtual Task OpenPositionAsync(Position position, CancellationToken ct = default)
         => _positions.OpenPositionAsync(position, ct);
 
     public virtual Task<decimal> ClosePositionFifoAsync(
@@ -142,6 +144,15 @@ public class TradingDataService
 
     public virtual Task<List<Position>> GetOpenPositionsAsync(string? symbol = null, CancellationToken ct = default)
         => _positions.GetOpenPositionsAsync(symbol, ct);
+
+    /// <summary>
+    /// 按交易所实际持仓校准本地账本（只对齐未平量与均价，不重算历史盈亏）。
+    /// 由 <c>PositionReconciliationService</c> 在启动与周期对账时调用。
+    /// </summary>
+    public Task ReconcileOpenPositionAsync(
+        string symbol, PositionSide side, decimal targetRemainingQty, decimal exchangeEntryPrice,
+        CancellationToken ct = default)
+        => _positions.ReconcileOpenPositionAsync(symbol, side, targetRemainingQty, exchangeEntryPrice, ct);
 
     /// <remarks>virtual 供单元测试替换。</remarks>
     public virtual Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)

@@ -1,5 +1,4 @@
 using MarketAssistant.Trading.Models;
-using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Trading;
 
@@ -45,8 +44,7 @@ public sealed record ShadowPerformance(
 /// </remarks>
 public sealed class StrategyPerformanceService(
     TradingDataService dataService,
-    ShadowTradingService shadowTradingService,
-    ILogger<StrategyPerformanceService> logger)
+    ShadowTradingService shadowTradingService)
 {
     /// <summary>统计单条策略的实盘绩效。无平仓成交时返回 null。</summary>
     public async Task<StrategyPerformance?> GetAsync(string strategyId, CancellationToken ct = default)
@@ -74,22 +72,14 @@ public sealed class StrategyPerformanceService(
     /// <summary>统计影子模式绩效（可按策略过滤）。</summary>
     public async Task<ShadowPerformance> GetShadowAsync(string? strategyId = null, CancellationToken ct = default)
     {
-        try
-        {
-            var trades = await shadowTradingService.LoadAsync(strategyId, ct: ct).ConfigureAwait(false);
-            var pnls = trades
-                .Where(trade => trade.RealizedPnl != 0)
-                .OrderBy(trade => trade.CreatedAt)
-                .Select(trade => trade.RealizedPnl)
-                .ToList();
+        var trades = await shadowTradingService.LoadAsync(strategyId, ct: ct).ConfigureAwait(false);
+        var pnls = trades
+            .Where(trade => trade.RealizedPnl != 0)
+            .OrderBy(trade => trade.CreatedAt)
+            .Select(trade => trade.RealizedPnl)
+            .ToList();
 
-            return BuildShadow(strategyId, pnls);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "统计影子绩效失败: {StrategyId}", strategyId);
-            return BuildShadow(strategyId, []);
-        }
+        return BuildShadow(strategyId, pnls);
     }
 
     private static StrategyPerformance? Build(string strategyId, List<TradeRecord> records)
@@ -103,7 +93,7 @@ public sealed class StrategyPerformanceService(
         if (pnls.Count == 0)
             return null;
 
-        var symbol = records.FirstOrDefault()?.Symbol ?? string.Empty;
+        var symbol = records[0].Symbol;
         return new StrategyPerformance(
             strategyId,
             symbol,

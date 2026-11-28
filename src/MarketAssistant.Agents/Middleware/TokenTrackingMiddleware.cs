@@ -23,10 +23,14 @@ public sealed class TokenTrackingMiddleware(
     public const string OutputTokensKey = "middleware:cumulativeOutputTokens";
 
     /// <summary>
-    /// 单个 Agent 会话累计 Token 上限，超过后抛出异常终止执行，防止工具调用循环失控。
-    /// 正常多轮对话约消耗 30k~80k tokens，此值设为 200k 以只拦截真正的死循环。
+    /// 单次运行 Token 上限（输入 + 输出），超限视为上下文或工具往返失控，抛出异常使该次运行按失败处理
+    /// （聊天丢弃会话并按 UI 历史重建，分析师由失败隔离降级）。
+    /// 这是运行结束后的事后检查，无法中途终止；工具循环的在途上限由 FunctionInvokingChatClient.MaximumIterationsPerRequest 负责。
+    /// 只按单次运行判定、会话累计仅做统计：聊天每轮都重发整段历史，累计值随轮数二次增长，
+    /// 普通对话十几轮就会越界，远早于上下文压缩（ConversationCompactionProviderFactory，128K 触发）生效，
+    /// 对话长度应交给压缩而不是熔断。
     /// </summary>
-    public const int MaxCumulativeTokens = 200_000;
+    public const int MaxTokensPerRun = 200_000;
 
     private readonly ILogger _logger = logger;
     private readonly ITokenUsageRecorder? _tokenUsageRecorder = tokenUsageRecorder;
@@ -94,6 +98,10 @@ public sealed class TokenTrackingMiddleware(
             isPrecise: streamingUsage != null);
     }
 
+    /// <summary>
+    /// 记录单次运行用量：上报运行级作用域，累计到会话（仅统计），再按单次运行上限熔断。
+    /// 熔断只对带会话的运行生效（聊天、工作流托管的分析师）。
+    /// </summary>
     internal void LogAndAccumulate(AgentSession? session, long inputTokens, long outputTokens, string? agentName,
         bool isPrecise = false)
     {
@@ -110,8 +118,8 @@ public sealed class TokenTrackingMiddleware(
             activity.SetTag("marketassistant.token_usage.precise", isPrecise);
         }
 
-        // 运行级用量记录：分析工作流的 Agent 以 session: null 无状态调用，
-        // 会话级累计不生效，因此必须先向环境作用域上报，再走会话累计与熔断逻辑。
+        // 运行级用量上报必须在 session 守卫之前：协调分析师、交易信号等以 session: null 无状态调用，
+        // 没有会话可累计，用量只能由环境作用域承接。
         _tokenUsageRecorder?.CurrentScope?.Report(agentName, inputTokens, outputTokens, isPrecise);
 
         if (session == null) return;
@@ -129,17 +137,16 @@ public sealed class TokenTrackingMiddleware(
 
             session.StateBag.SetValue(InputTokensKey, cumulativeInput.ToString());
             session.StateBag.SetValue(OutputTokensKey, cumulativeOutput.ToString());
+        }
 
-            // 熔断：累计 Token 超过上限时抛出异常，终止 Agent 执行，防止工具调用循环失控
-            var total = checked(cumulativeInput + cumulativeOutput);
-            if (total > MaxCumulativeTokens)
-            {
-                _logger.LogWarning(
-                    "Token 熔断触发 [{Agent}] - 累计 {Total} 超过上限 {Limit}（输入 {In}, 输出 {Out}）",
-                    agentName ?? "Unknown", total, MaxCumulativeTokens, cumulativeInput, cumulativeOutput);
-                throw new InvalidOperationException(
-                    $"Agent 累计 Token 用量 {total} 超过熔断上限 {MaxCumulativeTokens}，已终止执行以防止工具调用循环失控");
-            }
+        var runTotal = checked(inputTokens + outputTokens);
+        if (runTotal > MaxTokensPerRun)
+        {
+            _logger.LogWarning(
+                "Token 熔断触发 [{Agent}] - 单次运行 {Total} 超过上限 {Limit}（输入 {In}, 输出 {Out}）",
+                agentName ?? "Unknown", runTotal, MaxTokensPerRun, inputTokens, outputTokens);
+            throw new InvalidOperationException(
+                $"Agent 单次运行 Token 用量 {runTotal} 超过熔断上限 {MaxTokensPerRun}，已按失败处理以避免上下文失控");
         }
     }
 
