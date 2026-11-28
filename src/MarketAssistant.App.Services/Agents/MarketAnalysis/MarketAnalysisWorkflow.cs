@@ -412,8 +412,7 @@ public partial class MarketAnalysisWorkflow(
                         currentPhase = GetExecutorNamePrefix(executorInvoked.ExecutorId) switch
                         {
                             "AnalysisDispatcher" => AnalysisPhase.Analyzing,
-                            "AnalysisAggregator" => AnalysisPhase.Aggregating,
-                            "Coordinator" => AnalysisPhase.Reporting,
+                            "AnalysisAggregator" or "Coordinator" => AnalysisPhase.Reporting,
                             _ => currentPhase
                         };
 
@@ -670,13 +669,10 @@ public enum AnalysisPhase
     /// <summary>分析师并发执行中</summary>
     Analyzing,
 
-    /// <summary>聚合各分析师结果</summary>
-    Aggregating,
-
-    /// <summary>协调器生成综合报告</summary>
+    /// <summary>聚合各分析师结果并由协调器生成综合报告</summary>
     Reporting,
 
-    /// <summary>分析完成（或失败终态）</summary>
+    /// <summary>分析完成（或失败终态）；步骤条视其为全部步骤已完成，不单独作为一步展示</summary>
     Completed
 }
 

@@ -347,7 +347,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
                     AnalystRunStatus.Running => EstimateRunningCredit(a.Elapsed.TotalSeconds),
                     _ => 0.0
                 }) / e.Analysts.Count * 80.0, 0, 80),
-            AnalysisPhase.Aggregating => 89,
             AnalysisPhase.Reporting => 95,
             AnalysisPhase.Completed => 100,
             _ => _targetPercent
@@ -402,7 +401,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// <summary>
     /// 分析执行中：按运行中分析师的实时耗时持续重算目标百分比，
     /// 使两位分析师进度事件之间的空闲期百分比仍平滑推进，而非长时间停滞。
-    /// 仅在存在运行中条目时生效，避免覆盖阶段事件给出的目标值（聚合 89% / 报告 95%）
+    /// 仅在存在运行中条目时生效，避免覆盖阶段事件给出的目标值（报告 95%）
     /// </summary>
     private void RecomputeTargetPercentFromItems()
     {

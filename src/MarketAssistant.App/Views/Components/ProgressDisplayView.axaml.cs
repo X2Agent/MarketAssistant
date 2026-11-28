@@ -62,7 +62,7 @@ public partial class ProgressDisplayView : UserControl
     }
 
     /// <summary>
-    /// 当前流程阶段，驱动步骤条高亮（准备→分析→聚合→报告→完成）
+    /// 当前流程阶段，驱动步骤条高亮（准备→分析→报告；完成态为全部步骤已完成）
     /// </summary>
     public AnalysisPhase AnalysisPhase
     {
@@ -107,8 +107,8 @@ public partial class ProgressDisplayView : UserControl
     {
         InitializeComponent();
 
-        _phaseSteps = [PhaseStep0, PhaseStep1, PhaseStep2, PhaseStep3, PhaseStep4];
-        _phaseLinks = [PhaseLink0, PhaseLink1, PhaseLink2, PhaseLink3];
+        _phaseSteps = [PhaseStep0, PhaseStep1, PhaseStep2];
+        _phaseLinks = [PhaseLink0, PhaseLink1];
 
         // StyledProperty 变更不走 PropertyChanged 回调注册，这里监听属性值变化以刷新步骤条
         PropertyChanged += OnSelfPropertyChanged;
@@ -127,13 +127,12 @@ public partial class ProgressDisplayView : UserControl
     /// </summary>
     private void UpdatePhaseBar(AnalysisPhase phase)
     {
-        // Completed 视为全部完成；否则当前阶段索引 0..3（Completed 之外）
+        // Completed 视为全部完成（索引越过最后一步）；否则为当前阶段索引 0..2
         var currentIndex = phase switch
         {
             AnalysisPhase.Preparing => 0,
             AnalysisPhase.Analyzing => 1,
-            AnalysisPhase.Aggregating => 2,
-            AnalysisPhase.Reporting => 3,
+            AnalysisPhase.Reporting => 2,
             AnalysisPhase.Completed => _phaseSteps.Length,
             _ => 0
         };

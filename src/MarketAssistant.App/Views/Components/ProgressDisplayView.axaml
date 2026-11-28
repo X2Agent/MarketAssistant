@@ -81,17 +81,13 @@
                                Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
 
-            <!-- 流程步骤条：准备 → 分析 → 聚合 → 报告 → 完成 -->
+            <!-- 流程步骤条：准备 → 分析 → 报告（聚合并入报告；完成态即全部步骤已完成，不单列一步） -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Border x:Name="PhaseStep0" Classes="phaseStep"><TextBlock Text="准备"/></Border>
                 <Border x:Name="PhaseLink0" Classes="phaseLink"/>
                 <Border x:Name="PhaseStep1" Classes="phaseStep"><TextBlock Text="分析"/></Border>
                 <Border x:Name="PhaseLink1" Classes="phaseLink"/>
-                <Border x:Name="PhaseStep2" Classes="phaseStep"><TextBlock Text="聚合"/></Border>
-                <Border x:Name="PhaseLink2" Classes="phaseLink"/>
-                <Border x:Name="PhaseStep3" Classes="phaseStep"><TextBlock Text="报告"/></Border>
-                <Border x:Name="PhaseLink3" Classes="phaseLink"/>
-                <Border x:Name="PhaseStep4" Classes="phaseStep"><TextBlock Text="完成"/></Border>
+                <Border x:Name="PhaseStep2" Classes="phaseStep"><TextBlock Text="报告"/></Border>
             </StackPanel>
 
             <!-- 大号百分比 + 进度条 -->

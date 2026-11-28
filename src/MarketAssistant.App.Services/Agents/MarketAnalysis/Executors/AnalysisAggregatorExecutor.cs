@@ -152,12 +152,13 @@ public sealed partial class AnalysisAggregatorExecutor(
             degradeToken = _degradeCts.Token;
         }
 
-        _logger.LogWarning(
-            "分析师消息未收齐（{Collected} 成功 / {Failed} 失败 / 期望 {Expected}），将在 {Grace.TotalSeconds}s 后降级发送已有结果",
+        // Fan-In barrier 逐条转发，首批到达时必然未收齐，属常态；真正的降级以到期后的 Warning 为准
+        _logger.LogInformation(
+            "分析师消息未收齐（{Collected} 成功 / {Failed} 失败 / 期望 {Expected}），启动 {GraceSeconds}s 宽限计时，到期仍未收齐则降级发送已有结果",
             _analystMessages.Count,
             _failedMessages.Count,
             _expectedAnalystCount,
-            _incompleteGrace);
+            _incompleteGrace.TotalSeconds);
 
         _ = Task.Run(async () =>
         {
