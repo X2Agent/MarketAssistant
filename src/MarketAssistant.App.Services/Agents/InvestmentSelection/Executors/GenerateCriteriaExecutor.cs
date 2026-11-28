@@ -6,6 +6,7 @@ using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Text.Encodings.Web;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
@@ -23,6 +24,11 @@ public sealed class GenerateCriteriaExecutor<TCriteria>(
     private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
     private readonly ICriteriaGenerationStrategy<TCriteria> _strategy = strategy;
     private readonly ILogger<GenerateCriteriaExecutor<TCriteria>> _logger = logger;
+
+    private static readonly JsonSerializerOptions CriteriaLogOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     public override async ValueTask<CriteriaGenerationResult> HandleAsync(
         InvestmentSelectionWorkflowRequest input,
@@ -69,15 +75,18 @@ public sealed class GenerateCriteriaExecutor<TCriteria>(
                     chatOptions,
                     cancellationToken);
 
+            var criteria = _strategy.DeserializeCriteria(response.Text);
             var result = new CriteriaGenerationResult
             {
-                Criteria = _strategy.DeserializeCriteria(response.Text, input),
+                Criteria = criteria,
                 OriginalRequest = input
             };
 
-            _logger.LogInformation("[步骤1/3-{MarketType}] 筛选条件生成完成，包含 {Count} 个条件",
+            // 记录完整条件 JSON：结果为空或不符预期时，先看模型把需求译成了什么条件
+            _logger.LogInformation("[步骤1/3-{MarketType}] 筛选条件生成完成，包含 {Count} 个条件: {Criteria}",
                 _strategy.SupportedMarketType,
-                result.CriteriaCount);
+                result.CriteriaCount,
+                JsonSerializer.Serialize(criteria, CriteriaLogOptions));
 
             return result;
         }

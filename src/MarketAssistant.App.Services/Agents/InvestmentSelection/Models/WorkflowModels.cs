@@ -20,10 +20,10 @@ public record InvestmentSelectionWorkflowRequest
     // 用户需求分析相关字段
     public string? Content { get; init; }
     public string? RiskPreference { get; init; }
-    public decimal? InvestmentAmount { get; init; }
-    public int? InvestmentHorizon { get; init; }
-    public List<string> PreferredSectors { get; init; } = [];
-    public List<string> ExcludedSectors { get; init; } = [];
+
+    /// <summary>
+    /// 第 3 步最多推荐的数量；不影响筛选候选池大小
+    /// </summary>
     public int MaxRecommendations { get; init; } = 10;
 }
 

@@ -29,6 +29,11 @@ public partial class AssetSelectionPageViewModel
 
     public bool HasRiskWarnings => SelectionResult?.RiskWarnings.Count > 0;
 
+    public bool HasAppliedCriteria => !string.IsNullOrEmpty(SelectionResult?.AppliedCriteria);
+
+    /// <summary>结果头下方的“已应用的筛选条件”文案。</summary>
+    public string AppliedCriteriaText => $"筛选条件：{SelectionResult?.AppliedCriteria}";
+
     /// <summary>
     /// 推荐投资标的列表（用于UI绑定）。
     /// 集合实例保持不变、结果变更时原地替换内容：
@@ -81,6 +86,8 @@ public partial class AssetSelectionPageViewModel
         OnPropertyChanged(nameof(HasResult));
         OnPropertyChanged(nameof(HasRecommendations));
         OnPropertyChanged(nameof(HasRiskWarnings));
+        OnPropertyChanged(nameof(HasAppliedCriteria));
+        OnPropertyChanged(nameof(AppliedCriteriaText));
         OnPropertyChanged(nameof(RecommendationCountText));
         OnPropertyChanged(nameof(ResultSubtitle));
     }

@@ -55,10 +55,15 @@ public sealed partial class AnalyzeAssetsExecutor(
 
         try
         {
+            var appliedCriteria = CriteriaDescriber.Describe(input.Criteria);
+
             if (input.ScreenedAssets.Count == 0)
             {
                 _logger.LogWarning("[步骤3/3-{MarketType}] 未筛选到符合条件的资产", originalRequest.MarketType);
-                return CreateDefaultResult("未找到符合条件的资产，建议放宽筛选条件。");
+                return CreateEmptyResult(
+                    "未找到符合条件的资产，建议放宽筛选条件。",
+                    originalRequest.IsNewsAnalysis ? SelectionType.NewsBased : SelectionType.UserRequest,
+                    appliedCriteria);
             }
 
             // 根据市场类型获取对应的数据格式化器
@@ -119,6 +124,7 @@ public sealed partial class AnalyzeAssetsExecutor(
             }
 
             AttachScreeningQuotes(result, input.ScreenedAssets);
+            result.AppliedCriteria = appliedCriteria;
 
             _logger.LogInformation("[步骤3/3-{MarketType}] 分析完成，推荐 {Count} 个资产，置信度: {Score}",
                 originalRequest.MarketType, result.Recommendations.Count, result.ConfidenceScore);
@@ -150,7 +156,7 @@ public sealed partial class AnalyzeAssetsExecutor(
         }
     }
 
-    private static List<string> ValidateResult(
+    internal static List<string> ValidateResult(
         InvestmentSelectionResult result,
         AssetScreeningResult input,
         InvestmentSelectionWorkflowRequest request)
@@ -216,19 +222,6 @@ public sealed partial class AnalyzeAssetsExecutor(
             sb.AppendLine("## 用户需求");
             sb.AppendLine($"- 需求描述: {request.Content}");
             sb.AppendLine($"- 风险偏好: {request.RiskPreference}");
-
-            if (request.InvestmentAmount.HasValue)
-                sb.AppendLine($"- 投资金额: {request.InvestmentAmount:C}");
-
-            if (request.InvestmentHorizon.HasValue)
-                sb.AppendLine($"- 投资期限: {request.InvestmentHorizon}天");
-
-            if (request.PreferredSectors.Any())
-                sb.AppendLine($"- 偏好行业: {string.Join(", ", request.PreferredSectors)}");
-
-            if (request.ExcludedSectors.Any())
-                sb.AppendLine($"- 排除行业: {string.Join(", ", request.ExcludedSectors)}");
-
             sb.AppendLine();
         }
 
@@ -245,17 +238,24 @@ public sealed partial class AnalyzeAssetsExecutor(
         return sb.ToString();
     }
 
-    private InvestmentSelectionResult CreateDefaultResult(string message)
+    /// <summary>
+    /// 筛选阶段没有候选时的结果：这是正常的"无匹配"而不是分析失败，不带风险警示。
+    /// </summary>
+    private static InvestmentSelectionResult CreateEmptyResult(
+        string message,
+        SelectionType selectionType,
+        string appliedCriteria)
     {
         return new InvestmentSelectionResult
         {
-            SelectionType = SelectionType.UserRequest,
+            SelectionType = selectionType,
             Recommendations = [],
             ConfidenceScore = 0,
             AnalysisSummary = message,
-            MarketEnvironmentAnalysis = "无可用分析",
-            InvestmentAdvice = "建议重新尝试分析",
-            RiskWarnings = ["分析失败，请联系技术支持"]
+            MarketEnvironmentAnalysis = "未筛选到候选标的，本次未进行市场环境分析。",
+            InvestmentAdvice = "建议放宽筛选条件后重试。",
+            RiskWarnings = [],
+            AppliedCriteria = appliedCriteria
         };
     }
 }

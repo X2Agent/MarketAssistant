@@ -37,15 +37,6 @@ public class InvestmentSelectionService(
 
         var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, progress, cancellationToken);
 
-        if (validatedRequest.RiskPreference == "conservative")
-        {
-            result.Recommendations = [.. result.Recommendations.Where(r => r.RiskLevel != RiskLevel.High)];
-        }
-        else if (validatedRequest.RiskPreference == "aggressive")
-        {
-            result.Recommendations = [.. result.Recommendations.OrderByDescending(r => r.ExpectedReturn ?? 0)];
-        }
-
         _logger.LogInformation("用户需求投资选择完成，市场: {Market}，推荐数量: {Count}，置信度: {Confidence:F1}%",
             request.MarketType, result.Recommendations.Count, result.ConfidenceScore);
 
@@ -255,11 +246,7 @@ public class InvestmentSelectionService(
         {
             MarketType = request.MarketType,
             UserRequirements = request.UserRequirements?.Trim() ?? "",
-            InvestmentAmount = request.InvestmentAmount,
             RiskPreference = NormalizeRiskPreference(request.RiskPreference),
-            InvestmentHorizon = request.InvestmentHorizon,
-            PreferredSectors = request.PreferredSectors,
-            ExcludedSectors = request.ExcludedSectors,
             MaxRecommendations = Math.Clamp(request.MaxRecommendations, 1, 10)
         };
 

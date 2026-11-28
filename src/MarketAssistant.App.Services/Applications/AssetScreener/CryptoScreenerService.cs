@@ -20,16 +20,9 @@ public sealed class CryptoScreenerService(
     private const int COINGECKO_MAX_PER_PAGE = 250;
 
     /// <summary>
-    /// 常见稳定币集合：选币推荐与行情分析面向波动性标的，稳定币一旦入选会在后续转交易对时拼出 USDTUSDT 等无效代码。
-    /// </summary>
-    private static readonly HashSet<string> StableCoinSymbols = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "USDT", "USDC", "DAI", "TUSD", "BUSD", "FDUSD", "USDP", "USDE", "PYUSD", "FRAX"
-    };
-
-    /// <summary>
-    /// 根据筛选条件筛选虚拟币
-    /// 优先使用 CoinGecko（含市值/排名/供应量数据），失败时降级到 Binance（仅价格/成交量/涨跌幅）
+    /// 根据筛选条件筛选虚拟币。
+    /// 优先使用 CoinGecko（含市值/排名/供应量数据）并限定为币安有 USDT 现货交易对的币；
+    /// CoinGecko 不可用时降级到 Binance（仅价格/成交额/24h 涨跌幅，遇到无法执行的条件直接失败）。
     /// </summary>
     public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria, CancellationToken cancellationToken = default)
     {
@@ -38,36 +31,42 @@ public sealed class CryptoScreenerService(
             throw new ArgumentException("筛选条件类型错误，期望 CryptoCriteria", nameof(criteria));
         }
 
-        _logger.LogInformation("开始虚拟币筛选，条件数量: {Count}, 限制: {Limit}",
+        _logger.LogInformation("开始虚拟币筛选，条件数量: {Count}, 候选池: {Limit}",
             cryptoCriteria.Criteria.Count, cryptoCriteria.Limit);
 
         try
         {
-            // 1. 优先从 CoinGecko 获取数据（含市值、排名、供应量）
-            List<ScreenerAssetInfo> results;
+            List<CoinGeckoMarket> markets;
             try
             {
-                var markets = await FetchFromCoinGeckoAsync(cryptoCriteria, cancellationToken);
-                var filtered = ApplyFilters(markets, cryptoCriteria);
-                var limited = filtered.Take(cryptoCriteria.Limit).ToList();
-                results = ConvertToScreenerInfo(limited);
-                _logger.LogInformation("CoinGecko 筛选完成，结果数量: {Count}", results.Count);
+                markets = await FetchFromCoinGeckoAsync(cryptoCriteria, cancellationToken);
             }
             catch (Exception ex) when (ex is not ArgumentException and not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "CoinGecko 数据源不可用，降级到 Binance 兜底");
-                results = await FetchFromBinanceFallbackAsync(cryptoCriteria, cancellationToken);
-                _logger.LogInformation("Binance 兜底筛选完成，结果数量: {Count}", results.Count);
+                var fallbackResults = await FetchFromBinanceFallbackAsync(cryptoCriteria, cancellationToken);
+                _logger.LogInformation("Binance 兜底筛选完成，结果数量: {Count}", fallbackResults.Count);
+                return fallbackResults;
             }
 
-            return results;
+            // 候选限定为币安有 USDT 现货交易对的币：详情页、自选与交易都走币安，筛出无交易对的币用户无法继续操作。
+            // exchangeInfo 有 1 小时缓存；获取失败直接抛出，不降级为"不过滤"，否则会放行无法交易的币。
+            var exchangeSymbols = (await _binanceService.GetExchangeInfoAsync(cancellationToken))?.Symbols
+                ?? throw new FriendlyException("获取币安交易对信息失败，无法确认候选币种可交易，请稍后重试");
+            var tradableBaseAssets = exchangeSymbols
+                .Where(s => s.QuoteAsset == "USDT")
+                .Select(s => s.BaseAsset)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var candidates = ApplyFilters(markets, cryptoCriteria)
+                .Where(m => tradableBaseAssets.Contains(m.Symbol))
+                .Take(cryptoCriteria.Limit)
+                .ToList();
+            _logger.LogInformation("CoinGecko 筛选完成，结果数量: {Count}", candidates.Count);
+            return ConvertToScreenerInfo(candidates);
         }
-        catch (OperationCanceledException)
-        {
-            // 用户取消必须向上传播，不得包装成业务失败
-            throw;
-        }
-        catch (Exception ex)
+        // 用户取消与已带用户友好信息的 FriendlyException 原样上抛，不二次包装
+        catch (Exception ex) when (ex is not (OperationCanceledException or FriendlyException))
         {
             _logger.LogError(ex, "虚拟币筛选过程中发生错误");
             throw new FriendlyException("虚拟币筛选失败，请稍后重试", ex);
@@ -85,34 +84,25 @@ public sealed class CryptoScreenerService(
         // 确定分页参数（用于市值排名筛选）
         var (page, perPage) = DeterminePagination(criteria);
 
-        // 确定类别
-        var category = GetCategoryFilter(criteria);
+        _logger.LogDebug("CoinGecko查询参数 - Order: {Order}, Page: {Page}, PerPage: {PerPage}",
+            order, page, perPage);
 
-        // 确定需要的价格变化时间段
-        var priceChangePercentage = HasPriceChangeFilter(criteria) ? "7d,30d" : null;
-
-        _logger.LogDebug("CoinGecko查询参数 - Order: {Order}, Page: {Page}, PerPage: {PerPage}, Category: {Category}",
-            order, page, perPage, category);
-
-        // 调用CoinGecko API
-        var markets = await _coinGeckoService.GetCoinsMarketsAsync(
+        // 7d/30d 涨跌幅恒请求：条件筛选、稳定币识别与第三步分析都要用；不请求时 7d 字段整列为空
+        return await _coinGeckoService.GetCoinsMarketsAsync(
             vsCurrency: "usd",
-            category: category,
             order: order,
             perPage: perPage,
             page: page,
-            priceChangePercentage: priceChangePercentage,
+            priceChangePercentage: "7d,30d",
             cancellationToken: cancellationToken);
-
-        return markets;
     }
 
     /// <summary>
-    /// 应用本地筛选条件（同时排除稳定币）
+    /// 应用本地筛选条件（同时排除锚定型代币）
     /// </summary>
     internal static List<CoinGeckoMarket> ApplyFilters(List<CoinGeckoMarket> markets, CryptoCriteria criteria)
     {
-        var filtered = markets.Where(m => !IsStableCoin(m.Symbol));
+        var filtered = markets.Where(m => !IsPegged(m));
 
         foreach (var condition in criteria.Criteria)
         {
@@ -176,18 +166,19 @@ public sealed class CryptoScreenerService(
     }
 
     /// <summary>
-    /// Binance 兜底筛选：当 CoinGecko 不可用时，从币安获取 USDT 交易对行情
-    /// 注意：Binance 不提供市值/排名/供应量数据，相关筛选条件将被忽略
+    /// Binance 兜底筛选：当 CoinGecko 不可用时，从币安获取 USDT 交易对行情。
+    /// 币安行情不含市值/排名/供应量/7d/30d，遇到这类条件直接失败，见 <see cref="ApplyBinanceFilters"/>。
     /// </summary>
     private async Task<List<ScreenerAssetInfo>> FetchFromBinanceFallbackAsync(CryptoCriteria criteria, CancellationToken cancellationToken)
     {
         var tickers = await _binanceService.GetAll24hrTickersFullAsync(cancellationToken);
 
-        // 仅保留指定计价货币的交易对（默认 USDT），排除杠杆/稳定币交易对
+        // 仅保留指定计价货币的交易对（默认 USDT），排除锚定型交易对。
+        // 兜底行情没有 30d 涨跌幅，价格带比 CoinGecko 路径收窄到 0.97–1.03 以降低误伤
         var quoteCurrency = string.IsNullOrWhiteSpace(criteria.QuoteCurrency) ? "USDT" : criteria.QuoteCurrency;
         var filtered = tickers.Where(t =>
             t.Symbol.EndsWith(quoteCurrency, StringComparison.OrdinalIgnoreCase) &&
-            !IsStableCoinPair(t.Symbol)).ToList();
+            !(t.LastPrice is >= 0.97m and <= 1.03m && t.PriceChangePercent is > -1m and < 1m)).ToList();
 
         // 应用 Binance 支持的筛选条件（价格变化、成交量、当前价）
         filtered = ApplyBinanceFilters(filtered, criteria);
@@ -202,9 +193,11 @@ public sealed class CryptoScreenerService(
     }
 
     /// <summary>
-    /// 应用 Binance 数据支持的筛选条件（仅价格变化、成交量、当前价）
+    /// 应用 Binance 数据支持的筛选条件（仅 24h 涨跌幅、成交额、当前价）。
+    /// 其余条件（市值、排名、7d/30d 涨跌幅）币安无法执行，抛 <see cref="FriendlyException"/> 而不是静默忽略：
+    /// 忽略会让"市值前 50"返回成交额前 N 的无关币，用户还看不出条件被丢了。
     /// </summary>
-    private List<Binance24hrTicker> ApplyBinanceFilters(List<Binance24hrTicker> tickers, CryptoCriteria criteria)
+    internal static List<Binance24hrTicker> ApplyBinanceFilters(List<Binance24hrTicker> tickers, CryptoCriteria criteria)
     {
         var filtered = tickers.AsEnumerable();
 
@@ -224,8 +217,8 @@ public sealed class CryptoScreenerService(
                     (!condition.MinValue.HasValue || t.LastPrice >= condition.MinValue) &&
                     (!condition.MaxValue.HasValue || t.LastPrice <= condition.MaxValue)),
 
-                // market_cap、market_cap_rank、price_change_7d/30d 等 Binance 不支持，忽略
-                _ => filtered
+                _ => throw new FriendlyException(
+                    $"CoinGecko 暂时不可用，而币安行情不含“{condition.Code}”数据，无法按该条件筛选，请稍后重试")
             };
         }
 
@@ -233,18 +226,15 @@ public sealed class CryptoScreenerService(
     }
 
     /// <summary>
-    /// 判断是否为稳定币基础代码（排除 USDT、USDC、DAI 等）
+    /// 锚定型代币（稳定币与国债/理财类 RWA 代币）：价格贴近 1 美元且 24h、30d 波动极小。
+    /// 选币面向波动性标的，这类代币入选既无推荐价值，转交易对时还会拼出 USDTUSDT 等无效代码；
+    /// 固定符号清单会随新稳定币过期（2026-11-28 实测前 250 名里 10 符号清单只命中 8 个，本判定命中 54 个且无误伤）。
+    /// 已知残留：非美元稳定币、脱锚币、日波动大的 RWA 代币识别不到。
     /// </summary>
-    internal static bool IsStableCoin(string? symbol)
-        => !string.IsNullOrWhiteSpace(symbol) && StableCoinSymbols.Contains(symbol.Trim());
-
-    /// <summary>
-    /// 判断是否为稳定币交易对（排除 USDCUSDT、DAIUSDT 等）
-    /// </summary>
-    private static bool IsStableCoinPair(string symbol)
-    {
-        return StableCoinSymbols.Any(sc => symbol.StartsWith(sc + "USDT", StringComparison.OrdinalIgnoreCase));
-    }
+    internal static bool IsPegged(CoinGeckoMarket market) =>
+        market.CurrentPrice is >= 0.9m and <= 1.5m
+        && market.PriceChangePercentage24h is > -1m and < 1m
+        && market.PriceChangePercentage30dInCurrency is > -3m and < 3m;
 
     /// <summary>
     /// 将 Binance Ticker 转换为 ScreenerCryptoInfo
@@ -323,29 +313,9 @@ public sealed class CryptoScreenerService(
             return (page, COINGECKO_MAX_PER_PAGE);
         }
 
-        // 存在客户端过滤条件（市值/成交量/涨跌幅/价格等）时，需拉取完整候选池 (250) 供本地筛选后再 Take(Limit)；
-        // 无过滤条件时预留稳定币剔除余量即可。
-        if (criteria.Criteria.Count > 0)
-        {
-            return (1, COINGECKO_MAX_PER_PAGE);
-        }
-
-        return (1, Math.Clamp(criteria.Limit + 10, 20, COINGECKO_MAX_PER_PAGE));
-    }
-
-    private string? GetCategoryFilter(CryptoCriteria criteria)
-    {
-        var categoryFilter = criteria.Criteria.FirstOrDefault(c =>
-            c.Code.Equals("category", StringComparison.OrdinalIgnoreCase));
-
-        return categoryFilter?.MinValue?.ToString(); // 使用MinValue存储类别名称
-    }
-
-    private bool HasPriceChangeFilter(CryptoCriteria criteria)
-    {
-        return criteria.Criteria.Any(c =>
-            c.Code.Contains("price_change_7d", StringComparison.OrdinalIgnoreCase) ||
-            c.Code.Contains("price_change_30d", StringComparison.OrdinalIgnoreCase));
+        // 其余情况一律拉满 250：本地要先剔除锚定型代币、再与币安 USDT 现货交易对求交（2026-11-28 实测
+        // 非稳定币里约 36%–51% 没有交易对），带条件时还要本地过滤，只拉 Limit+10 条凑不满候选池。
+        return (1, COINGECKO_MAX_PER_PAGE);
     }
 
     #endregion

@@ -283,12 +283,20 @@
                 <!-- ============================ 结果态 ============================ -->
                 <!-- 独占整个内容区、从页面顶部开始：需求摘要在结果头里，「新的选股」回到输入态并保留输入内容。 -->
                 <StackPanel Spacing="{StaticResource LargeSpacing}" IsVisible="{Binding HasResult}">
-                    <controls:PageHeaderView Title="{Binding ResultTitle}"
-                                             Description="{Binding ResultSubtitle}">
-                        <Button Content="{Binding NewSelectionText}"
-                                Classes="btn-secondary"
-                                Command="{Binding NewSelectionCommand}"/>
-                    </controls:PageHeaderView>
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <controls:PageHeaderView Title="{Binding ResultTitle}"
+                                                 Description="{Binding ResultSubtitle}">
+                            <Button Content="{Binding NewSelectionText}"
+                                    Classes="btn-secondary"
+                                    Command="{Binding NewSelectionCommand}"/>
+                        </controls:PageHeaderView>
+                        <!-- 已应用的筛选条件：让用户看到模型把需求译成了什么条件，结果为空或不符预期时先看这里。
+                             页头说明被设计成单行截断，条件文案较长，所以单独成行 -->
+                        <TextBlock Text="{Binding AppliedCriteriaText}"
+                                   Classes="caption"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding HasAppliedCriteria}"/>
+                    </StackPanel>
 
                     <!-- AI 研判：先看结论。置信度仅在有推荐时显示，
                          0 推荐时是默认占位结果，置信度 0 会被误读成“AI 毫无把握” -->
@@ -329,8 +337,7 @@
                         </StackPanel>
                     </controls:CardView>
 
-                    <!-- 0 推荐：默认占位结果里的建议/风险是“分析失败，请联系技术支持”之类的占位文案，
-                         不能渲染，只给说明与返回入口 -->
+                    <!-- 0 推荐：默认占位结果里的建议文案是通用占位，不渲染，只给说明与返回入口 -->
                     <controls:CardView IsVisible="{Binding !HasRecommendations}">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}" HorizontalAlignment="Center">
                             <TextBlock Text="未筛出符合条件的标的"

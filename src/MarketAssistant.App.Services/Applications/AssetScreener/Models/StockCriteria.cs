@@ -32,9 +32,9 @@ public class StockCriteria : IScreeningCriteria
     public IndustryType Industry { get; set; } = IndustryType.All;
 
     /// <summary>
-    /// 返回数量限制
+    /// 候选池大小（由系统固定，不取模型输出）
     /// </summary>
-    [Description("推荐股票数量上限")]
+    [Description("候选池大小，由系统固定覆盖，随意填写即可")]
     public int Limit { get; set; } = 20;
 }
 

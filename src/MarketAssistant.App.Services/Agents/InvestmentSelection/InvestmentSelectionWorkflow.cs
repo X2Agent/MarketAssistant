@@ -37,10 +37,6 @@ public class InvestmentSelectionWorkflow(
             IsNewsAnalysis = false,
             Content = request.UserRequirements,
             RiskPreference = request.RiskPreference,
-            InvestmentAmount = request.InvestmentAmount,
-            InvestmentHorizon = request.InvestmentHorizon,
-            PreferredSectors = request.PreferredSectors,
-            ExcludedSectors = request.ExcludedSectors,
             MaxRecommendations = request.MaxRecommendations
         };
 
@@ -104,9 +100,14 @@ public class InvestmentSelectionWorkflow(
             cancellationToken: cancellationToken);
 
         InvestmentSelectionResult? finalResult = null;
+        string? lastEvent = null;
 
         await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
         {
+            lastEvent = evt is ExecutorEvent executorEvent
+                ? $"{evt.GetType().Name}({executorEvent.ExecutorId})"
+                : evt.GetType().Name;
+
             switch (evt)
             {
                 case ExecutorInvokedEvent executorInvoked:
@@ -161,7 +162,11 @@ public class InvestmentSelectionWorkflow(
         // 事件流未产出结果说明工作流中途失败（各 Executor 已把异常包装上抛），
         // 把"失败"伪装成结构完整的默认结果会让用户误以为"AI 认为没有合适标的"
         if (finalResult == null)
+        {
+            // 这种失败日志里没有任何步骤失败事件，最后一个事件是唯一线索
+            _logger.LogError("投资选择工作流事件流结束但没有输出，最后一个事件: {LastEvent}", lastEvent);
             throw new FriendlyException("投资选择工作流未返回结果，分析未完成，请重试。");
+        }
 
         return finalResult;
     }
