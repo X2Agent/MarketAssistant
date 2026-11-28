@@ -14,7 +14,7 @@
 	<AssemblyVersion>1.0.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
     <!-- 静态兜底版本号：有 Git Tag 时由 ResolveVersionFromGitTag 自动覆盖为最新 Tag，发版后由 CI 自动回写 -->
-    <FallbackVersion>1.0.0-beta2</FallbackVersion>
+    <FallbackVersion>1.0.0-beta3</FallbackVersion>
     <Version>$(FallbackVersion)</Version>
     <Company>X2Agent</Company>
     <Product>Market Assistant</Product>
