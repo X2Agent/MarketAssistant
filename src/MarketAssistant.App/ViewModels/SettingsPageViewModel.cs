@@ -74,7 +74,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(IsFuturesTradingMode));
                 break;
             case nameof(UserSetting.WebSearchProvider):
-                OnPropertyChanged(nameof(IsBingProvider));
                 OnPropertyChanged(nameof(IsBraveProvider));
                 OnPropertyChanged(nameof(IsTavilyProvider));
                 break;
@@ -84,7 +83,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public List<string> WebSearchProviders { get; } = ["Bing", "Brave", "Tavily"];
+    public List<string> WebSearchProviders { get; } = ["Brave", "Tavily"];
 
     public List<RiskToleranceLevel> RiskToleranceOptions { get; } = [.. Enum.GetValues<RiskToleranceLevel>()];
 
@@ -188,16 +187,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == TradingMode.FuturesTestnet;
 
     public bool IsFuturesTradingMode => IsLiveFuturesTradingMode || IsFuturesTestnetTradingMode;
-
-    public bool IsBingProvider
-    {
-        get => UserSetting.WebSearchProvider == "Bing";
-        set
-        {
-            if (value)
-                UserSetting.WebSearchProvider = "Bing";
-        }
-    }
 
     public bool IsBraveProvider
     {

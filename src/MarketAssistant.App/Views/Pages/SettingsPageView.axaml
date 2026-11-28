@@ -425,9 +425,6 @@
                                 <StackPanel Spacing="{StaticResource DefaultSpacing}">
                                     <TextBlock Text="搜索平台选择" Classes="form-label"/>
                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
-                                        <RadioButton Content="Bing"
-                                                     GroupName="SearchProvider"
-                                                     IsChecked="{Binding IsBingProvider}"/>
                                         <RadioButton Content="Brave"
                                                      GroupName="SearchProvider"
                                                      IsChecked="{Binding IsBraveProvider}"/>

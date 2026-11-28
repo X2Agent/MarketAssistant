@@ -222,7 +222,7 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// Web Search服务商
     /// </summary>
-    private string _webSearchProvider = "Bing";
+    private string _webSearchProvider = "Brave";
     public string WebSearchProvider
     {
         get => _webSearchProvider;
