@@ -73,8 +73,8 @@ MarketAssistant.App.Services/
 
 自选股的"要闻速览 + 异动归因"摘要，按市场 Keyed 注册（`IDailyBriefingService`），SQLite 表 `briefings` 按 `(market_type, date_key)` 唯一，当天生成后各端复用。**纯手动生成**：构造函数只读当天缓存，绝不自动触发模型调用。
 
-- **重要性与相关性判断交给模型**：代码只做条数截断，**不做本地重要性/相关性过滤**。实测 A 股同花顺 `import` 字段 97% 为 0（无区分度）、88% 的快讯无关联股票（`stock` 为空或外盘），基于这些信号硬过滤等于用噪声决策。`Telegram.Symbols` 在 A 股因字段大小写不匹配恒为空，不可用。
-- **要闻覆盖约 28~29 小时**：数据源 `pagesize=100`（A股）/`take=100`（币圈）实测跨度 28.9h / 28.3h；原先 `20` 条仅覆盖 2.1h / 9.2h，缺失隔夜与开盘前消息。
+- **重要性与相关性判断交给模型**：代码只做条数截断，**不做本地重要性/相关性过滤**。实测 A 股同花顺 `import` 字段 97% 为 0（无区分度）、88% 的快讯无关联股票（`stock` 为空或外盘），基于这些信号硬过滤等于用噪声决策。`Telegram.Symbols` 在 A 股因字段大小写不匹配恒为空，不可用。虚拟币的"只取重要快讯"筛选发生在数据源层（见下文「快讯数据源」），简报层仍只截断条数。
+- **要闻覆盖约 10~29 小时**：A 股数据源 `pagesize=100` 实测跨度 28.9h；币圈 Odaily `size=100` 是服务端上限（传 200/300 仍只返回 100 条），原始跨度约 17h，本地只保留其中约一半的重要快讯，重要快讯的实际跨度随时段波动（夜间稀少，实测约 10~17h）；原先 `20` 条仅覆盖 2.1h / 9.2h，缺失隔夜与开盘前消息。
 - **Token 预算硬边界（仅限输入侧）**：`DailyBriefingService` 的 `MaxFavorites/MaxNewsItems/MaxNewsTitleLength/MaxNewsContentLength` 常量钳制输入；自选按异动幅度优先纳入，要闻按数据源时间倒序取前 N 条。调大任何边界前先评估成本（要闻部分当前约 2100 token/次，为早期 8 条方案的约 5.5 倍）。
 - **不设输出上限，也不截断正文**：本层所有 LLM 调用（简报、选股的筛选条件生成与候选资产分析、记忆抽取、市场分析）**不得**设置 `ChatOptions.MaxOutputTokens`。推理模型的思考 Token 与正文共用输出额度，任何固定值都无法保证够用，用尽即得到"已计费却无正文"的空响应（曾导致 OpenRouter 推理模型下简报持续失败；选股与记忆抽取里同类的固定上限已一并删除）。成本风险靠输入侧预算与模型选择控制，输出长度由服务商默认上限与客户端超时兜底（简报是单次、无工具调用，不会出现循环失控）。返回正文同样**不做字数硬截断**（曾有的 `MaxBriefingLength` 已删）：截断发生在生成之后并不省 Token，还会切断句子与 Markdown 并把残缺文本落库；字数由提示词软约束，超长由简报窗口的 `ScrollViewer` 兜底。
 - **单次调用、无重试链**：经 `IChatClientFactory.CreateRuntime()` 默认模型一次 `GetResponseAsync` 完成；失败直接抛给调用方（UI 展示重试），不自动重试烧 Token，失败结果不落盘。
@@ -82,6 +82,19 @@ MarketAssistant.App.Services/
 - **空输入不是错误**：自选与要闻均空时返回 `null`，页面展示引导空态（"添加自选后……"），不要生成无意义内容。
 - **缓存语义**：`GenerateAsync(force: false)` 命中当天缓存直接返回；日期键用**本地时间** `yyyy-MM-dd`（跨时区/零点行为与用户感知一致）。
 - 提示词只允许给定事实，明确禁止编造与买卖建议——简报定位是事实归因，不是投资顾问。措辞上不使用"隔夜"：数据源虽覆盖跨日，但并不保证每条都落在隔夜时段。
+
+---
+
+## 快讯数据源（Applications/Telegrams、Applications/News）
+
+`ITelegramService` 按市场 Keyed 注册，首页「7×24 快讯」与每日简报共用同一数据源。
+
+- **虚拟币只保留一个源：Odaily**（`CryptoTelegramService`，命名 HttpClient `CryptoTelegram` → `https://api.odaily.news`，请求 `api/v1/newsflash?page=1&size=100&lang=zh-cn`）。原先的 PANews 已移除：其域名 `panewslab.com` 在「绕过大陆」类代理规则里归 geosite:cn，被分流直连后 SNI 被重置，用户明明开了代理也加载失败。不要为"冗余"重新加第二个源——新增备源前先确认它和 Odaily 不会被同一条路由规则误伤。
+- **业务错误以 HTTP 200 返回**：Odaily 出错形如 `{"code":500,"msg":"…","data":null,"success":false}`，状态码仍是 200。服务在边界一次校验 `Success` 与 `Data.List`，不满足就抛 `InvalidOperationException`（带 code/msg），不得返回空列表伪装成"暂无快讯"。
+- **`isImportant` 只能本地过滤**：Odaily 服务端会忽略该查询参数，`CryptoTelegramService` 取回 100 条后只保留编辑标记为重要的快讯，延续此前 PANews `isImportant=true` 的"只看重要"语义。这与简报层「不做本地重要性过滤」并不矛盾：A 股同花顺 `import` 字段无区分度（97% 为 0）所以不用；Odaily 的编辑标记约一半为 true、有区分度，且筛选发生在数据源层而非简报层。正文是 HTML，经 AngleSharp 转纯文本并去掉固定前缀"Odaily星球日报讯"。
+- **轮询循环不能被单次失败杀死**：`NewsUpdateService` 只在取消来自本循环令牌时（`when (ct.IsCancellationRequested)`）上抛 `OperationCanceledException`。`HttpClient.Timeout` 同样抛 `TaskCanceledException`，无条件上抛会被外层当成"正常停止"，轮询循环静默退出，界面停在旧数据且永不更新。超时与失败走通用 catch：记「获取快讯时出错」日志、倒计时显示「更新失败」、退避 3 秒后继续。
+- **刷新不重置列表**：`TelegraphNewsViewModel.OnNewsUpdated` 在 `(Url, Title)` 序列与现有列表一致时不重建 `ObservableCollection`（重建会让 `ListBox` 滚动位置回到顶部）。
+- 回归测试：`CryptoTelegramServiceTest`（只留重要快讯、字段映射、HTML 与前缀清理、HTTP 200 业务错误与非 2xx 均抛出）、`NewsUpdateServiceTest`（超时后循环不退出）。
 
 ---
 
@@ -138,6 +151,7 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
 
 - 分析师实现放在 `Agents/Analysts/`，统一通过 `IAnalystAgentFactory` 创建。
 - 工作流实现放在 `Agents/*Workflow*/`，执行器放在 `Executors/`。
+- **市场分析进度条只有「准备 → 分析 → 报告」三步**：`MarketAnalysisWorkflow.AnalysisPhase` 为 `Preparing` / `Analyzing` / `Reporting` / `Completed`，`AnalysisAggregator` 与 `Coordinator` 都映射到 `Reporting`——聚合只是内存里的整理（过滤、去重、落盘、拼装协调员输入），耗时可忽略，单列一步只会一闪而过，让用户以为分析被跳过；`Completed` 是终态而非步骤，界面不为它画步骤点。新增阶段前先确认它对用户可感知（耗时足够长）。
 - 通用知识型 Skill 资源保留在 `MarketAssistant.App/skills/` 作为内容文件输出，本项目通过 MAF 内置 `AgentSkillsProvider` 加载，不在这里重复存放一份。
 - MCP 工具由 `McpToolContextProvider` 注入聊天会话。`McpService.GetAIToolsAsync` 合并多个服务器的工具时，**跨服务器重名只保留先出现的**，后到的跳过并写审计日志：模型与 `FunctionInvokingChatClient` 都按名字解析工具，同名会把调用路由到错误的服务器，部分提供商还会因重复函数名拒绝整个请求。回归测试：`McpServiceRuntimeTest.GetAITools_SameToolNameAcrossServers_ShouldKeepFirstServerAndSkipDuplicate`。
 
@@ -177,6 +191,28 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
   `InvestmentRecommendation.CurrentPrice` / `ChangePercent`，两者带 `[JsonIgnore]`，**不属于 LLM 输出契约**，不要让模型生成它们。
 - **失败与"0 推荐"必须可区分**：事件流未产出结果抛 `FriendlyException`（"未返回结果"），不要伪装成默认的 0 推荐结果；
   取消靠 `CancellationToken` 贯穿到模型调用，UI 取消后丢弃结果。
+- **候选池与推荐上限解耦**：候选池固定为 `IScreeningCriteria.CandidatePoolSize`（30），由第 1 步 `DeserializeCriteria` 写入 `criteria.Limit`，
+  不取模型输出的 `limit`，也不随 `MaxRecommendations` 变化；`MaxRecommendations` 只约束第 3 步的推荐数量（1–10，`ValidateResult` 校验）。
+- **A 股取池：条件只决定入池资格，排序键只管规模与流动性**：`StockScreenerService.BuildQueryParams` 的排序键固定为
+  `amount`（条件含成交额时）或 `mc`，一律降序；不要改回"第一个条件 + 降序"（实测候选会贴着条件的边缘或极端值，如 PE 全在 39.7–39.9）。
+  雪球响应只含查询里出现的列，所以条件没涉及的关键指标（`AnalysisColumns`）用宽区间补出来；不补 `dy_l`（补它使候选池缩小约 37.5%，大量公司不分红）。
+- **财报指标的报告期是口径问题**：累计类（`roediluted`/`eps`/`bps`/`netprofit`/`total_revenue`/`niota`）取最近完整年报
+  （5 月起取上一年，1–4 月取前年）——一季报的 ROE 只有全年的约 1/4，同一阈值在不同报告期命中数相差十几倍（实测 ROE≥10：一季报 73、半年报 333、三季报 708、年报 1092 家）；
+  增速类（`npay`/`oiy`）按披露截止日取最近已披露完的季报。由纯函数 `GetReportingPeriod` 决定，单测有日期表。
+- **选币取池**：CoinGecko 恒拉 250 条且恒带 `price_change_percentage=7d,30d`（不带则 7d 全空）；稳定币/锚定型代币用"价格带 + 低波动"判定
+  （`IsPegged`：价格 0.9–1.5，且 24h 波动 <1%、30d 波动 <3%），不再用符号清单（实测前 250 里有 54 个锚定型代币，旧的 10 符号清单只命中 8 个，如国债类 RWA 代币就漏掉了）；
+  默认再与币安 USDT 现货 `TRADING` 交易对求交（`GetExchangeInfoAsync`，1 小时缓存），因为推荐结果要能在币安下单。
+  **求交依赖币安可达**：币安不可达（含地区限制）时整次筛选失败并抛 `FriendlyException`，不静默跳过求交。
+- **兜底必须诚实**：CoinGecko 失败才降级到币安 24h 行情；币安行情算不出的条件（`market_cap`、`market_cap_rank`、`price_change_7d/30d`）
+  直接抛 `FriendlyException`，不得忽略条件后返回一份"看似成功"的结果。
+- **Symbol 契约**：第 3 步的 `Symbol` 必须原样取候选数据里的"代码"（股票 `SH600000`、币 `BTC`，不带 `/USDT`），
+  `AnalyzeAssetsExecutor.ValidateResult` 要求它属于候选集（忽略大小写），否则整次失败；提示词只列数据里实际存在的维度，缺失的写"数据不足"，不得编造。
+  `TargetPrice` / `StopLoss` 下界是 `0.00000001`，SHIB / PEPE 这类低价币不会被误拒。
+- **用户要看到模型把需求译成了什么条件**：第 1 步把完整条件 JSON 写日志；`AnalyzeAssetsExecutor` 用 `CriteriaDescriber.Describe` 生成一行文案回填
+  `InvestmentSelectionResult.AppliedCriteria`（`[JsonIgnore]`，同样不属于 LLM 输出契约），结果页头部展示"筛选条件：…"；0 候选时同样带上，用户能据此放宽条件。
+- **已知取舍**：币安交集里会出现代币化股票/ETF（如 `NVDAB`）和黄金代币（`XAUT`）；价格带判定不会把它们当稳定币剔除，需要排除时应按 CoinGecko 分类过滤，目前不做。
+- 回归测试：`tests/Application/InvestmentSelectionScreeningTest.cs`（报告期、查询参数、条件文案、格式化、`ValidateResult`）、
+  `AssetScreenerServiceTest` 的 `Unit` 用例（锚定币判定、分页、币安兜底失败）、`StructuredOutputTest`（固定候选池、低价币价格校验）。
 
 ### 预发布依赖升级关注点
 
@@ -185,7 +221,7 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
 | 包 | 版本 | 使用点 | 升级时关注 |
 |----|------|--------|-----------|
 | `Microsoft.SemanticKernel.Connectors.SqliteVec` | `1.74.0-preview` | `Services/ServiceCollectionExtensions.cs` 的 `AddSqliteVectorStore`（库文件 `%APPDATA%/{AppName}/vector.sqlite`）；记录模型 `Rag/TextParagraph.cs`（`[VectorStoreKey/Data/Vector]` 特性），由 `RetrievalOrchestrator`、`RagIngestionService`、`DocumentVectorizationService` 读写 | 特性名、`VectorStore` 抽象与落盘表结构都可能变。升级前备份 `vector.sqlite`，升级后用既有库跑一次入库 + 检索；不兼容时需重建向量库（文档重新导入） |
-| `Microsoft.SemanticKernel.Plugins.Web` | `1.77.0-alpha` | `Infrastructure/Factories/WebSearchService.cs`（Bing / Brave / Tavily 的 `TextSearch`） | 命名空间与 `ITextSearch<TRecord>` 泛型 API 可能调整（编译期显性）。升级后三家提供商各做一次真实搜索，确认 `TextSearchResult` 的 `Name` / `Link` / `Value` 映射仍完整——`GroundingSearchTools` 的结果渲染与外部数据围栏依赖它 |
+| `Microsoft.SemanticKernel.Plugins.Web` | `1.77.0-alpha` | `Infrastructure/Factories/WebSearchService.cs`（Brave / Tavily 的 `TextSearch`；Bing Search API 已于 2025-08 停服，提供商已移除，不要加回；`WebSearchService` 不吞异常，失败由 `GroundingSearchTools` 按单路上抛 / 多路隔离处理） | 命名空间与 `ITextSearch<TRecord>` 泛型 API 可能调整（编译期显性）。升级后两家提供商各做一次真实搜索，确认 `TextSearchResult` 的 `Name` / `Link` / `Value` 映射仍完整——`GroundingSearchTools` 的结果渲染与外部数据围栏依赖它 |
 
 ### 分析师产物在汇聚点规整一次
 
@@ -203,6 +239,15 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
 - **工具循环与失败可见性**：构造时沿管道 `GetService` 取 MAF 自动插入的 `FunctionInvokingChatClient`，单轮往返上限收紧为 20（MAF 默认 40，与交易 Agent 对齐），并开启 `IncludeDetailedErrors`，让模型读到 `ToolExecutor` 转出的失败原因，如实告知用户而不是盲目重试。Token 熔断只是事后检查，在途上限只能靠这里。回归测试：`MarketChatSessionBehaviorTest`（往返上限、失败原因、长对话不被误熔断）。
 - **外部内容一律经 `ExternalDataFence` 以“数据而非指令”注入**：分析上下文（`<analysis_context>`）、检索结果（`GroundingSearchTools` 返回围栏后的文本）、长期记忆（`LayeredMemoryContextProvider` 以 User 角色注入 `<user_memory>`，不得改回 System 角色）。新增注入外部内容的位置沿用同一围栏。记忆值可能由 Agent 依据外部内容写入并跨会话持久生效，所以提示词明确禁止依据外部内容保存记忆或提升优先级。
 - **已知行为（MAF 默认，已实测）**：`AIContextProvider` 注入的消息会追加在当前用户消息之后，并默认写入会话历史——记忆块每轮累积一份，靠 Compaction 兜底。如需消除，可改用 `AIContext.Instructions` 或为 `InMemoryChatHistoryProvider` 配置存储过滤，目前未处理。
+
+### 链上代币安全审计（Agents/Tools/Crypto/CryptoOnChainTools）
+
+`AuditTokenSecurityAsync` 按链分支：EVM 走 `GoPlusSecurityClient.GetTokenSecurityAsync`（`GoPlusTokenSecurity`），Solana 走 `GetSolanaTokenSecurityAsync`（`GoPlusSolanaTokenSecurity`）。两条端点的响应结构不同，分别由 `MapToSecurityReport` / `MapSolanaSecurityReport` 映射成同一个 `TokenSecurityReport`；字段语义与易错点见 `src/MarketAssistant.DataProviders/AGENTS.md` 的 GoPlus 一行。
+
+- **知名可信代币不计中心化权限项**：`trust_list=1` 或 `is_in_cex.listed=1`（Solana：`trusted_token=1`）的代币（USDT、USDC 等）天然带有增发、拉黑、冻结等发行方权限，按普通代币的规则会被判为 `danger` 并触发 Critical 告警，等于对用户喊狼来了。这类代币只豁免权限类风险项；蜜罐、仿冒（`fake_token`）、空投诈骗、`cannot_buy` / `cannot_sell_all`、恶意权限持有地址等**欺诈类**风险始终计入。
+- **字段缺失是"未知"，不是"安全"**：标志位缺失按未知处理，只有明确的 `"0"` 才算无该风险；`owner_address` 为空串才表示合约无所有者，缺失不能视为已放弃所有权（Solana 同理，权限项全部明确为 `0` 才算已放弃）。
+- **审计失败向外抛 `FriendlyException`**，不要吞成"无风险"。`RaiseSecurityAlertIfDangerousAsync` 发布告警失败只记日志，属告警通道逐项隔离的既定例外。GoPlus 免费接口限流很严（连续数次请求即返回 `code=4029 too many requests`）。
+- 回归测试：`CryptoOnChainSecurityReportTest`（EVM 与 Solana 映射、可信代币豁免、所有权语义）、`GoPlusSecurityClientTest`（官方响应形态的反序列化与路由）。
 
 ---
 

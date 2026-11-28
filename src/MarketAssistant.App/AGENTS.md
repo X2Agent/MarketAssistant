@@ -155,6 +155,8 @@ MarketAssistant.App/
 - 取消静默回到输入态；失败回到输入态，顶部失败条（Danger `StatusBanner`）就地显示并给 `重试`（`RetrySelectionCommand` 重放上一次运行），**不弹全局模态框**。
 - `新的选股` 回到输入态、保留输入内容、丢弃结果；离开页面（`Dispose`）与切换市场都会取消在途运行，结果不跨页保留。
 - 运行进行中不接受第二次运行（每次运行都消耗 Token）。
+- 结果头下方的「筛选条件：…」一行来自服务层回填的 `InvestmentSelectionResult.AppliedCriteria`（`HasAppliedCriteria` 控制显隐），
+  让用户看到模型把需求译成了什么条件；视图模型不要自己拼条件文案。
 - 视图模型按三态拆成 partial：`AssetSelectionPageViewModel.cs`（输入态、模式卡、市场切换）、`.Run.cs`（运行流程、进度、计时、取消 / 重试）、`.Results.cs`（结果列表、星标回显、跳转）。`FileSizeGuardTest` 限制单文件 600 行，新逻辑放进对应分部，不要塞回主文件。
 
 ### 输入法兼容（Windows 拼音按 Shift 提交重复）
