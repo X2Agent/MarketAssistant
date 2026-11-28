@@ -95,6 +95,17 @@ public static class BusinessServiceCollectionExtensions
             ConfigureBinanceRateLimiter(options);
         });
 
+        // 现货公共行情只读主机：与 api.binance.com 的行情响应一致，但不受地区限制（后者在部分出口 IP 返回 451）。
+        // 签名交易、账户与时间同步仍走上面的 Binance 客户端。
+        services.AddHttpClient("BinanceMarketData", client =>
+        {
+            client.BaseAddress = new Uri("https://data-api.binance.vision");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).AddStandardResilienceHandler(options =>
+        {
+            ConfigureBinanceRateLimiter(options);
+        });
+
         services.AddHttpClient("BinanceFutures", client =>
         {
             client.BaseAddress = new Uri("https://fapi.binance.com");
@@ -252,10 +263,10 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
-        // 虚拟币快讯接口（PANews）
+        // 虚拟币快讯接口（Odaily，唯一来源）
         services.AddHttpClient("CryptoTelegram", client =>
         {
-            client.BaseAddress = new Uri("https://universal-api.panewslab.com");
+            client.BaseAddress = new Uri("https://api.odaily.news");
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 

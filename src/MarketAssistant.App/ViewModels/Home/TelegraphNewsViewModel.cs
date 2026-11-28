@@ -92,10 +92,14 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         // Avalonia: 使用Dispatcher在UI线程执行
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            Telegraphs.Clear();
-            foreach (var item in news)
+            // 轮询结果与当前列表一致时不重建：每分钟 Clear 再 Add 会让滚动位置回到顶部
+            if (!Telegraphs.Select(item => (item.Url, item.Title)).SequenceEqual(news.Select(item => (item.Url, item.Title))))
             {
-                Telegraphs.Add(item);
+                Telegraphs.Clear();
+                foreach (var item in news)
+                {
+                    Telegraphs.Add(item);
+                }
             }
 
             IsAwaitingFirstNews = false;

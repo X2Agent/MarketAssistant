@@ -1,14 +1,13 @@
+using AngleSharp.Html.Parser;
 using MarketAssistant.Applications.Assets;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
+using System.Net.Http.Json;
 
 namespace MarketAssistant.Applications.Telegrams;
 
 /// <summary>
-/// 虚拟币市场快讯服务，调用 PANews 快讯API（中文）
-/// 数据来源：https://www.panewslab.com/zh/newsflash
+/// 虚拟币市场快讯服务，调用 Odaily 星球日报官方快讯 API（中文，唯一来源）
+/// 数据来源：https://www.odaily.news/zh-CN/newsflash
 /// </summary>
 public class CryptoTelegramService(
     ILogger<CryptoTelegramService> logger,
@@ -19,93 +18,53 @@ public class CryptoTelegramService(
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ICryptoAliasRegistry _aliasRegistry = aliasRegistry;
 
-    // take=100 覆盖约 28 小时（实测 take=20 仅 9.2h），使每日简报能跨越隔夜时段。
-    // isImportant=true 由服务端预筛：实测返回的 100 条全部为重要，密度高于全量拉取
-    // （不限时仅 46% 重要）。此处不再依赖该字段做本地排序，重要性判断交给模型。
-    private const string ApiUrl =
-        "https://universal-api.panewslab.com/articles?type=NEWS&isShowInList=true&take=100&skip=0&isImportant=true";
+    // size=100 是服务端上限（传更大值仍只返回 100 条），实测覆盖约 17 小时，其中约一半为重要快讯。
+    private const string RequestUri = "api/v1/newsflash?page=1&size=100&lang=zh-cn";
+
+    // 正文几乎都以该固定前缀开头，对读者与模型都是噪声。
+    private const string ContentPrefix = "Odaily星球日报讯";
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>
-    /// 通过 PANews API 获取虚拟币市场实时快讯（中文）
+    /// 通过 Odaily API 获取虚拟币市场实时快讯（中文）。
+    /// 接口服务端会忽略 isImportant 参数，故在本地只保留编辑标记为重要的快讯；
+    /// 非 2xx 与 HTTP 200 承载的业务错误（success=false）都会抛出，空列表仅表示确实没有快讯。
     /// </summary>
     public async Task<List<Telegram>> GetTelegraphsAsync(CancellationToken cancellationToken = default)
     {
-        var result = new List<Telegram>();
-
         var client = _httpClientFactory.CreateClient("CryptoTelegram");
+        var payload = await client.GetFromJsonAsync<OdailyResponse>(RequestUri, JsonOptions, cancellationToken);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, ApiUrl);
-        request.Headers.TryAddWithoutValidation("Accept", "application/json");
-        request.Headers.TryAddWithoutValidation("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (payload is not { Success: true, Data.List: { } flashes })
         {
-            _logger.LogWarning("获取 PANews 快讯失败，状态码: {StatusCode}", (int)response.StatusCode);
-            return result;
+            throw new InvalidOperationException(
+                $"Odaily 快讯接口返回错误: code={payload?.Code}, msg={payload?.Msg}");
         }
 
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var articles = JsonSerializer.Deserialize<List<PanewsArticle>>(json, JsonOptions);
-
-        if (articles is not { Count: > 0 })
+        var parser = new HtmlParser();
+        var result = new List<Telegram>();
+        foreach (var flash in flashes.Where(flash => flash.IsImportant))
         {
-            _logger.LogWarning("PANews API 返回数据为空");
-            return result;
-        }
-
-        _logger.LogInformation("PANews API 返回 {Count} 条快讯", articles.Count);
-
-        foreach (var article in articles)
-        {
-            try
+            var content = parser.ParseDocument(flash.Content).Body!.TextContent.Trim();
+            if (content.StartsWith(ContentPrefix, StringComparison.Ordinal))
             {
-                var title = article.Title ?? string.Empty;
-                var content = !string.IsNullOrWhiteSpace(article.Desc) ? article.Desc : title;
+                content = content[ContentPrefix.Length..].Trim();
+            }
 
-                result.Add(new Telegram
-                {
-                    Time = FormatIsoTime(article.PublishedAt),
-                    Title = title,
-                    Content = content,
-                    Url = $"https://www.panewslab.com/zh/articles/{article.Id}",
-                    Symbols = await ExtractCryptoSymbolsAsync(title, content, cancellationToken),
-                    IsImportant = article.IsImportant == true
-                });
-            }
-            catch (Exception ex)
+            result.Add(new Telegram
             {
-                _logger.LogWarning(ex, "映射 PANews 快讯项失败: {Message}", ex.Message);
-            }
+                Time = DateTimeOffset.FromUnixTimeMilliseconds(flash.PublishTimestamp).ToLocalTime().ToString("HH:mm:ss"),
+                Title = flash.Title,
+                Content = content,
+                Url = flash.Link,
+                Symbols = await ExtractCryptoSymbolsAsync(flash.Title, content, cancellationToken),
+                IsImportant = flash.IsImportant
+            });
         }
 
-        _logger.LogInformation("成功获取 {Count} 条虚拟币快讯（PANews）", result.Count);
+        _logger.LogInformation("成功获取 {Count} 条虚拟币快讯（Odaily）", result.Count);
         return result;
-    }
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        NumberHandling = JsonNumberHandling.AllowReadingFromString
-    };
-
-    /// <summary>
-    /// 格式化 ISO 8601 时间为本地时间字符串
-    /// </summary>
-    private static string FormatIsoTime(string? isoTime)
-    {
-        if (string.IsNullOrWhiteSpace(isoTime))
-            return string.Empty;
-
-        try
-        {
-            return DateTimeOffset.Parse(isoTime).ToLocalTime().ToString("HH:mm:ss");
-        }
-        catch
-        {
-            return string.Empty;
-        }
     }
 
     /// <summary>
@@ -122,38 +81,32 @@ public class CryptoTelegramService(
             .OrderBy(s => s)];
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // PANews API 响应模型
-    // ─────────────────────────────────────────────────────────────
-
-    private class PanewsArticle
+    private sealed class OdailyResponse
     {
-        [JsonPropertyName("id")]
-        public string Id { get; set; } = string.Empty;
+        public int Code { get; set; }
 
-        [JsonPropertyName("title")]
-        public string? Title { get; set; }
+        public string? Msg { get; set; }
 
-        [JsonPropertyName("desc")]
-        public string? Desc { get; set; }
+        public bool Success { get; set; }
 
-        [JsonPropertyName("publishedAt")]
-        public string? PublishedAt { get; set; }
-
-        [JsonPropertyName("isImportant")]
-        public bool? IsImportant { get; set; }
-
-        [JsonPropertyName("author")]
-        public PanewsAuthor? Author { get; set; }
+        public OdailyData? Data { get; set; }
     }
 
-    private class PanewsAuthor
+    private sealed class OdailyData
     {
-        [JsonPropertyName("id")]
-        public string? Id { get; set; }
+        public List<OdailyFlash>? List { get; set; }
+    }
 
-        [JsonPropertyName("name")]
-        public string? Name { get; set; }
+    private sealed class OdailyFlash
+    {
+        public string Title { get; set; } = string.Empty;
+
+        public string Content { get; set; } = string.Empty;
+
+        public bool IsImportant { get; set; }
+
+        public long PublishTimestamp { get; set; }
+
+        public string Link { get; set; } = string.Empty;
     }
 }
-

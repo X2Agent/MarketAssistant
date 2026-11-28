@@ -52,8 +52,17 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         {
             var recentAssets = await HistoryService.GetHistoryAsync();
 
-            // 并行补全实时价格/涨跌幅（单个失败仅留空，不影响整体加载）
-            await Task.WhenAll(recentAssets.Select(EnrichWithQuoteAsync));
+            // 单次批量补全实时价格/涨跌幅（虚拟币为一次批量行情请求；行情仅为附加信息，失败项为 null 时留空）
+            var infos = await AssetInfoService.GetAssetInfosAsync(
+                [.. recentAssets.Select(asset => new FavoriteAsset { Code = asset.Code })]);
+            for (var i = 0; i < recentAssets.Count; i++)
+            {
+                if (infos[i] is not { } info)
+                    continue;
+
+                recentAssets[i].CurrentPrice = info.CurrentPrice;
+                recentAssets[i].ChangePercentage = info.ChangePercentage;
+            }
 
             RecentAssets.Clear();
             foreach (var asset in recentAssets)
@@ -63,20 +72,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
 
             return RecentAssets.Count > 0;
         }, "加载最近查看资产");
-    }
-
-    private async Task EnrichWithQuoteAsync(AssetItem asset)
-    {
-        try
-        {
-            var info = await AssetInfoService.GetAssetInfoAsync(asset.Code);
-            asset.CurrentPrice = info.CurrentPrice;
-            asset.ChangePercentage = info.ChangePercentage;
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogWarning(ex, "补全最近查看资产行情失败: {Code}", asset.Code);
-        }
     }
 
     public async Task AddToRecentAssetsAsync(AssetItem asset)

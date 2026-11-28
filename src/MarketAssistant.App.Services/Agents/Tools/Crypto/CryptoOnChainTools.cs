@@ -107,11 +107,23 @@ public sealed class CryptoOnChainTools(
     {
         return await ToolExecutor.ExecuteAsync("代币安全审计", $"{chainId}:{tokenAddress}", _logger, async _ =>
         {
-            var security = await _goPlusClient.GetTokenSecurityAsync(chainId, tokenAddress, cancellationToken);
-            if (security is null)
-                throw new FriendlyException("未找到该代币的安全审计数据，请确认合约地址与链 ID 是否正确");
+            const string NotFoundMessage = "未找到该代币的安全审计数据，请确认合约地址与链 ID 是否正确";
 
-            var report = MapToSecurityReport(ChainRegistry.Normalize(chainId), tokenAddress, security);
+            var canonicalChainId = ChainRegistry.Normalize(chainId);
+            TokenSecurityReport report;
+            if (canonicalChainId == "solana")
+            {
+                var solanaSecurity = await _goPlusClient.GetSolanaTokenSecurityAsync(tokenAddress, cancellationToken)
+                    ?? throw new FriendlyException(NotFoundMessage);
+                report = MapSolanaSecurityReport(tokenAddress, solanaSecurity);
+            }
+            else
+            {
+                var security = await _goPlusClient.GetTokenSecurityAsync(canonicalChainId, tokenAddress, cancellationToken)
+                    ?? throw new FriendlyException(NotFoundMessage);
+                report = MapToSecurityReport(canonicalChainId, tokenAddress, security);
+            }
+
             await RaiseSecurityAlertIfDangerousAsync(report, cancellationToken);
             _logger.LogInformation(
                 "代币安全审计完成: {Symbol} 风险等级 {RiskLevel} 蜜罐 {IsHoneypot}",
@@ -176,45 +188,45 @@ public sealed class CryptoOnChainTools(
     }
 
     /// <summary>
-    /// 将 GoPlus 原始审计字段映射为结构化安全报告，并汇总综合风险等级。
+    /// 将 GoPlus EVM 原始审计字段映射为结构化安全报告，并汇总综合风险等级。
+    /// 知名可信代币（trust_list=1 或已上线主流 CEX，官方称此时其他风险提示通常可忽略）不计增发/拉黑等
+    /// 中心化权限类风险项；蜜罐、空投诈骗、仿冒代币等硬性风险始终计入。
     /// </summary>
-    private static TokenSecurityReport MapToSecurityReport(string chainId, string tokenAddress, GoPlusTokenSecurity security)
+    internal static TokenSecurityReport MapToSecurityReport(string chainId, string tokenAddress, GoPlusTokenSecurity security)
     {
         var riskReasons = new List<string>();
 
+        var isTrusted = security.TrustList == "1" || security.IsInCex?.Listed == "1";
         var isHoneypot = security.IsHoneypot == "1";
+        var isFakeToken = security.FakeToken?.Value == 1;
+
         if (isHoneypot) riskReasons.Add("蜜罐代币：买入后无法卖出");
         if (security.CannotSellAll == "1") riskReasons.Add("无法卖出全部持仓");
-        if (security.SlippageModifiable == "1") riskReasons.Add("合约可修改交易滑点");
-        if (security.IsSlippageModified == "1") riskReasons.Add("合约已修改过交易滑点");
-        if (security.IsMintable == "1") riskReasons.Add("合约可增发代币");
-        if (security.IsOwnerCanChangeBalance == "1") riskReasons.Add("所有者可任意修改余额");
-        if (security.SelfDestruct == "1") riskReasons.Add("合约可自毁");
-        if (security.IsBlackList == "1") riskReasons.Add("合约可拉黑地址禁止交易");
-        if (security.TransferPausable == "1") riskReasons.Add("所有者可暂停全部转账");
-        if (security.HiddenOwner == "1") riskReasons.Add("隐藏所有者权限");
+        if (security.CannotBuy == "1") riskReasons.Add("沙箱模拟无法买入（反机器人机制也可能触发）");
+        if (security.HoneypotWithSameCreator == "1") riskReasons.Add("创建者曾发布过蜜罐代币");
+        if (security.IsAirdropScam == "1") riskReasons.Add("存在空投诈骗风险");
+        if (isFakeToken) riskReasons.Add($"疑似仿冒主流代币（真实代币地址：{security.FakeToken!.TrueTokenAddress}）");
         if (security.IsOpenSource != "1") riskReasons.Add("合约未开源，无法审计");
         if (security.HolderCount != null && int.TryParse(security.HolderCount, out var holders) && holders < 10)
             riskReasons.Add($"持有者过少（{holders} 个），疑似假币");
-        if (security.TradingCooldown == "1") riskReasons.Add("存在交易冷却时间限制");
-        if (security.PersonalSlippageModifiable == "1") riskReasons.Add("可对单个地址设置个性化滑点");
-        if (security.IsAirdropScam == "1") riskReasons.Add("存在空投诈骗风险");
-        if (security.FakeToken == "1") riskReasons.Add("疑似假冒代币");
+        if (!string.IsNullOrEmpty(security.OtherPotentialRisks)) riskReasons.Add(security.OtherPotentialRisks);
 
-        var riskLevel = riskReasons.Count switch
+        if (!isTrusted)
         {
-            0 => "safe",
-            _ when isHoneypot || security.IsOwnerCanChangeBalance == "1" || security.FakeToken == "1" => "danger",
-            _ when riskReasons.Count >= 3 => "danger",
-            _ => "warning"
-        };
+            if (security.SlippageModifiable == "1") riskReasons.Add("合约可修改交易滑点");
+            if (security.IsMintable == "1") riskReasons.Add("合约可增发代币");
+            if (security.OwnerChangeBalance == "1") riskReasons.Add("所有者可任意修改余额");
+            if (security.Selfdestruct == "1") riskReasons.Add("合约可自毁");
+            if (security.IsBlacklisted == "1") riskReasons.Add("合约可拉黑地址禁止交易");
+            if (security.TransferPausable == "1") riskReasons.Add("所有者可暂停全部转账");
+            if (security.HiddenOwner == "1") riskReasons.Add("隐藏所有者权限");
+            if (security.CanTakeBackOwnership == "1") riskReasons.Add("所有者可收回已放弃的所有权");
+            if (security.TradingCooldown == "1") riskReasons.Add("存在交易冷却时间限制");
+            if (security.PersonalSlippageModifiable == "1") riskReasons.Add("可对单个地址设置个性化滑点");
+        }
 
-        var advice = riskLevel switch
-        {
-            "safe" => "未检测到明显风险项，但仍需关注流动性规模与持仓集中度。",
-            "warning" => "存在中等风险项，参与前需谨慎评估，建议小仓位并设置止损。",
-            _ => "高风险代币，强烈建议回避；AI 不会为该代币生成买入建议。"
-        };
+        var hasCriticalReason = isHoneypot || isFakeToken || (!isTrusted && security.OwnerChangeBalance == "1");
+        var (riskLevel, advice) = AssessRisk(riskReasons, hasCriticalReason, isTrusted);
 
         return new TokenSecurityReport
         {
@@ -227,11 +239,12 @@ public sealed class CryptoOnChainTools(
             BuyTaxPercent = ParsePercent(security.BuyTax),
             SellTaxPercent = ParsePercent(security.SellTax),
             IsMintable = security.IsMintable == "1",
-            IsTradableRestricted = security.TransferPausable == "1" || security.IsBlackList == "1",
+            IsTradableRestricted = security.TransferPausable == "1" || security.IsBlacklisted == "1",
             IsFeeChangable = security.SlippageModifiable == "1",
-            IsBlacklistable = security.IsBlackList == "1",
-            IsWhitelistable = security.IsWhiteList == "1",
-            IsOwnershipRenounced = security.CannotBeModified == "1",
+            IsBlacklistable = security.IsBlacklisted == "1",
+            IsWhitelistable = security.IsWhitelisted == "1",
+            // owner_address：空串表示合约无所有者，字段缺失表示未知，不能视为已放弃
+            IsOwnershipRenounced = security.OwnerAddress is { Length: 0 } && security.CanTakeBackOwnership != "1",
             IsOpenSource = security.IsOpenSource == "1",
             IsProxyContract = security.IsProxy == "1",
             HasEnoughHolders = security.HolderCount == null ||
@@ -239,6 +252,97 @@ public sealed class CryptoOnChainTools(
             IsAntiWhaleModified = security.AntiWhaleModifiable == "1",
             SecurityAdvice = advice
         };
+    }
+
+    /// <summary>
+    /// 将 GoPlus Solana 审计字段映射为结构化安全报告。Solana 无蜜罐/税率字段，
+    /// 以权限项（增发/冻结/关闭/改余额/升级手续费）、转账钩子与恶意地址标记评估；
+    /// 知名可信代币（trusted_token=1）不计权限类风险项。
+    /// </summary>
+    internal static TokenSecurityReport MapSolanaSecurityReport(string tokenAddress, GoPlusSolanaTokenSecurity security)
+    {
+        var riskReasons = new List<string>();
+
+        var isTrusted = security.TrustedToken == 1;
+        var isMintable = security.Mintable?.Status == 1;
+        var isFreezable = security.Freezable?.Status == 1;
+        var isClosable = security.Closable?.Status == 1;
+        var canChangeBalance = security.BalanceMutableAuthority?.Status == 1;
+        var isFeeUpgradable = security.TransferFeeUpgradable?.Status == 1;
+        var hasTransferHook = security.TransferHook is { Count: > 0 };
+        var isNonTransferable = security.NonTransferable == 1;
+        var isDefaultFrozen = security.DefaultAccountState == 2;
+        GoPlusSolanaAuthority?[] authorities =
+        [
+            security.Mintable, security.Freezable, security.Closable,
+            security.BalanceMutableAuthority, security.TransferFeeUpgradable
+        ];
+        var hasMaliciousAuthority = authorities.Any(authority =>
+            authority?.Authority?.Any(holder => holder.MaliciousAddress == 1) == true);
+
+        if (hasMaliciousAuthority) riskReasons.Add("权限持有地址被标记为恶意地址");
+        if (isNonTransferable) riskReasons.Add("代币不可转让（non-transferable），买入后无法转出或卖出");
+        if (isDefaultFrozen) riskReasons.Add("新建代币账户默认冻结，需冻结权限持有者解冻后才能交易");
+        if (security.HolderCount != null && int.TryParse(security.HolderCount, out var holders) && holders < 10)
+            riskReasons.Add($"持有者过少（{holders} 个），疑似假币");
+
+        if (!isTrusted)
+        {
+            if (isMintable) riskReasons.Add("增发权限未放弃，可无限增发代币");
+            if (isFreezable) riskReasons.Add("存在冻结权限，可冻结任意持有者账户");
+            if (isClosable) riskReasons.Add("存在关闭权限，可关闭代币账户");
+            if (canChangeBalance) riskReasons.Add("存在余额修改权限，可任意修改持有者余额");
+            if (isFeeUpgradable) riskReasons.Add("转账手续费配置可被升级，可能随时调高税率");
+            if (hasTransferHook) riskReasons.Add("启用转账钩子（Transfer Hook），转账会触发额外合约逻辑");
+        }
+
+        var hasCriticalReason = hasMaliciousAuthority || isNonTransferable || isDefaultFrozen || (!isTrusted && canChangeBalance);
+        var (riskLevel, advice) = AssessRisk(riskReasons, hasCriticalReason, isTrusted);
+
+        return new TokenSecurityReport
+        {
+            Symbol = security.Metadata?.Symbol ?? string.Empty,
+            TokenAddress = tokenAddress,
+            ChainId = "solana",
+            RiskLevel = riskLevel,
+            RiskReasons = riskReasons,
+            IsHoneypot = isNonTransferable || isDefaultFrozen,
+            IsMintable = isMintable,
+            IsTradableRestricted = isFreezable || isNonTransferable || isDefaultFrozen,
+            IsFeeChangable = isFeeUpgradable,
+            IsBlacklistable = isFreezable,
+            // 全部权限项明确为 0 才视为已放弃；字段缺失表示未知
+            IsOwnershipRenounced = authorities.All(authority => authority?.Status == 0),
+            // SPL Token 为标准开源程序，无需像 EVM 那样逐合约核验源码
+            IsOpenSource = true,
+            HasEnoughHolders = security.HolderCount == null ||
+                (int.TryParse(security.HolderCount, out var holderCount) && holderCount >= 10),
+            SecurityAdvice = advice
+        };
+    }
+
+    /// <summary>
+    /// 按风险项汇总综合等级与建议：含致命项或风险项不少于 3 条为 danger，有风险项为 warning，否则 safe。
+    /// </summary>
+    private static (string RiskLevel, string Advice) AssessRisk(List<string> riskReasons, bool hasCriticalReason, bool isTrusted)
+    {
+        var riskLevel = riskReasons.Count switch
+        {
+            0 => "safe",
+            _ when hasCriticalReason || riskReasons.Count >= 3 => "danger",
+            _ => "warning"
+        };
+
+        var advice = riskLevel switch
+        {
+            "safe" => "未检测到明显风险项，但仍需关注流动性规模与持仓集中度。",
+            "warning" => "存在中等风险项，参与前需谨慎评估，建议小仓位并设置止损。",
+            _ => "高风险代币，强烈建议回避；AI 不会为该代币生成买入建议。"
+        };
+
+        return (riskLevel, isTrusted
+            ? advice + "该代币被 GoPlus 标记为知名可信代币，增发/拉黑/冻结等中心化权限属其常规特征，未计入风险项。"
+            : advice);
     }
 
     /// <summary>

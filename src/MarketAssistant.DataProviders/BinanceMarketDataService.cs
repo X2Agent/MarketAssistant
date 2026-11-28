@@ -20,6 +20,12 @@ public sealed class BinanceMarketDataService(
     private readonly IMemoryCache _memoryCache = memoryCache;
 
     /// <summary>
+    /// 现货公共行情使用的命名 HttpClient：指向只读行情主机 data-api.binance.vision，
+    /// 响应与 api.binance.com 一致，但不受地区限制（后者在部分出口 IP 返回 451）。
+    /// </summary>
+    private const string SpotClientName = "BinanceMarketData";
+
+    /// <summary>
     /// 交易所信息缓存键
     /// </summary>
     private const string ExchangeInfoCacheKey = "BinanceExchangeInfo";
@@ -106,7 +112,7 @@ public sealed class BinanceMarketDataService(
         var url = $"/api/v3/ticker/24hr?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}";
         _logger.LogDebug("调用币安API: {Url}", url);
 
-        return await GetAndDeserializeAsync<Binance24hrTicker>("Binance", url, cancellationToken, BinanceJsonSerializerOptions);
+        return await GetAndDeserializeAsync<Binance24hrTicker>(SpotClientName, url, cancellationToken, BinanceJsonSerializerOptions);
     }
 
     /// <summary>
@@ -133,7 +139,7 @@ public sealed class BinanceMarketDataService(
 
         _logger.LogDebug("批量调用币安API: {Count}个交易对", symbols.Count);
 
-        var tickers = await GetAndDeserializeAsync<List<Binance24hrTicker>>("Binance", url, cancellationToken, BinanceJsonSerializerOptions);
+        var tickers = await GetAndDeserializeAsync<List<Binance24hrTicker>>(SpotClientName, url, cancellationToken, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取币安24h行情数据，交易对数量: {Count}", tickers?.Count ?? 0);
         return tickers ?? [];
     }
@@ -147,7 +153,7 @@ public sealed class BinanceMarketDataService(
         var url = "/api/v3/ticker/24hr?type=MINI&symbolStatus=TRADING";
         _logger.LogDebug("调用币安API获取所有交易对24h行情");
 
-        var tickers = await GetAndDeserializeAsync<List<Binance24hrTicker>>("Binance", url, cancellationToken, BinanceJsonSerializerOptions);
+        var tickers = await GetAndDeserializeAsync<List<Binance24hrTicker>>(SpotClientName, url, cancellationToken, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取所有币安24h行情数据，交易对数量: {Count}", tickers?.Count ?? 0);
         return tickers ?? [];
     }
@@ -162,7 +168,7 @@ public sealed class BinanceMarketDataService(
         var url = "/api/v3/ticker/24hr?symbolStatus=TRADING";
         _logger.LogDebug("调用币安API获取所有交易对24h行情(FULL)");
 
-        var tickers = await GetAndDeserializeAsync<List<Binance24hrTicker>>("Binance", url, cancellationToken, BinanceJsonSerializerOptions);
+        var tickers = await GetAndDeserializeAsync<List<Binance24hrTicker>>(SpotClientName, url, cancellationToken, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取所有币安24h行情数据(FULL)，交易对数量: {Count}", tickers?.Count ?? 0);
         return tickers ?? [];
     }
@@ -193,7 +199,7 @@ public sealed class BinanceMarketDataService(
             var url = "/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false";
             _logger.LogDebug("调用币安交易所信息API");
 
-            var exchangeInfo = await GetAndDeserializeAsync<BinanceExchangeInfo>("Binance", url, cancellationToken, BinanceJsonSerializerOptions);
+            var exchangeInfo = await GetAndDeserializeAsync<BinanceExchangeInfo>(SpotClientName, url, cancellationToken, BinanceJsonSerializerOptions);
             _logger.LogInformation("成功获取交易所信息，交易对数量: {Count}", exchangeInfo?.Symbols?.Count ?? 0);
 
             if (exchangeInfo != null)
@@ -290,7 +296,7 @@ public sealed class BinanceMarketDataService(
 
         _logger.LogDebug("调用币安K线API: {Symbol} {Interval}", symbol, interval);
 
-        var klines = await GetAndDeserializeAsync<JsonArray>("Binance", url, cancellationToken, options: null);
+        var klines = await GetAndDeserializeAsync<JsonArray>(SpotClientName, url, cancellationToken, options: null);
         _logger.LogInformation("成功获取K线数据: {Symbol}, 数量: {Count}", symbol, klines?.Count ?? 0);
         return klines;
     }
@@ -308,7 +314,7 @@ public sealed class BinanceMarketDataService(
 
         _logger.LogDebug("调用币安深度API: {Symbol}", symbol);
 
-        return await GetAndDeserializeAsync<JsonObject>("Binance", url, cancellationToken, options: null);
+        return await GetAndDeserializeAsync<JsonObject>(SpotClientName, url, cancellationToken, options: null);
     }
 
     #endregion
@@ -324,7 +330,7 @@ public sealed class BinanceMarketDataService(
 
         _logger.LogDebug("调用币安交易记录API: {Symbol}", symbol);
 
-        return await GetAndDeserializeAsync<JsonArray>("Binance", url, cancellationToken, options: null);
+        return await GetAndDeserializeAsync<JsonArray>(SpotClientName, url, cancellationToken, options: null);
     }
 
     #endregion
